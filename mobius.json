@@ -1,0 +1,29 @@
+{
+  "id": "artifacts",
+  "name": "Artifacts",
+  "version": "0.1.0",
+  "description": "Browse, preview, version, and share interactive HTML artifacts created in Möbius chats.",
+  "author": "mobius-os",
+  "license": "MIT",
+  "homepage": "https://github.com/mobius-os/app-artifacts",
+  "entry": "index.jsx",
+  "icon": "icon.png",
+  "skills": ["artifacts.md"],
+  "permissions": {
+    "chat_log_access": "summary"
+  },
+  "source_files": [
+    "artifacts.md",
+    "domain.js",
+    "storage.js",
+    "theme.js",
+    "preview/ArtifactFrame.jsx",
+    "ui/ArtifactCard.jsx",
+    "ui/Detail.jsx",
+    "ui/Empty.jsx",
+    "ui/Gallery.jsx",
+    "ui/Icons.jsx",
+    "ui/ShareSheet.jsx",
+    "ui/VersionTimeline.jsx"
+  ]
+}
