@@ -15,6 +15,12 @@ export function slugifyTitle(value) {
   return normalized || 'artifact'
 }
 
+export function artifactFilename(title, version) {
+  const numericVersion = Number(version)
+  const safeVersion = Number.isInteger(numericVersion) && numericVersion > 0 ? numericVersion : 1
+  return `${slugifyTitle(title)}-v${safeVersion}.html`
+}
+
 function randomHex4(random = Math.random) {
   return Math.floor(random() * 0x10000).toString(16).padStart(4, '0').slice(-4)
 }

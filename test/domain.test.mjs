@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   appendVersion,
+  artifactFilename,
   artifactIntent,
   createArtifactId,
   isValidProjectId,
@@ -18,6 +19,12 @@ test('slugifyTitle produces a stable lowercase storage segment', () => {
   assert.equal(slugifyTitle('  Café Revenue — Q3!  '), 'cafe-revenue-q3')
   assert.equal(slugifyTitle('***'), 'artifact')
   assert.ok(slugifyTitle('a'.repeat(80)).length <= 40)
+})
+
+test('artifactFilename is safe for downloads', () => {
+  assert.equal(artifactFilename('../../Quarterly Report', 3), 'quarterly-report-v3.html')
+  assert.equal(artifactFilename('Résumé — 日本語', 2), 'resume-v2.html')
+  assert.equal(artifactFilename('', 0), 'artifact-v1.html')
 })
 
 test('createArtifactId produces an id valid for storage and publish project_id', () => {

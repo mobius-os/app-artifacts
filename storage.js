@@ -1,4 +1,4 @@
-const chatTitleCache = new Map()
+let chatTitleCache = new Map()
 let chatTitlesPromise = null
 let chatTitlePermission = 'unknown'
 
@@ -9,6 +9,13 @@ async function responseDetail(response) {
   } catch {
     return ''
   }
+}
+
+async function responseError(response, fallback) {
+  const detail = await responseDetail(response)
+  const error = new Error(detail || fallback)
+  error.status = response.status
+  return error
 }
 
 export function makeStorage(appId, token) {
@@ -45,7 +52,7 @@ export function makeStorage(appId, token) {
       headers: { ...auth, 'Content-Type': 'application/json' },
       body: JSON.stringify(value),
     })
-    if (!response.ok) throw new Error(`Could not save ${path} (${response.status}).`)
+    if (!response.ok) throw await responseError(response, `Could not save ${path} (${response.status}).`)
     return { synced: true }
   }
 
@@ -56,7 +63,7 @@ export function makeStorage(appId, token) {
       headers: { ...auth, 'Content-Type': 'text/html;charset=utf-8' },
       body: value,
     })
-    if (!response.ok) throw new Error(`Could not save ${path} (${response.status}).`)
+    if (!response.ok) throw await responseError(response, `Could not save ${path} (${response.status}).`)
     return { synced: true }
   }
 
@@ -113,10 +120,7 @@ export function makeStorage(appId, token) {
       body: JSON.stringify({ project_id: projectId }),
     })
     if (!response.ok) {
-      const detail = await responseDetail(response)
-      const error = new Error(detail || `Could not publish (${response.status}).`)
-      error.status = response.status
-      throw error
+      throw await responseError(response, `Could not publish (${response.status}).`)
     }
     return response.json()
   }
@@ -153,6 +157,7 @@ export async function loadChatTitles(token) {
   if (chatTitlesPromise) return chatTitlesPromise
   chatTitlesPromise = (async () => {
     let cursor = 0
+    const nextTitles = new Map()
     do {
       const params = new URLSearchParams({ limit: '100', cursor: String(cursor) })
       const response = await fetch(`/api/chat-logs?${params}`, {
@@ -165,10 +170,11 @@ export async function loadChatTitles(token) {
       if (!response.ok) throw new Error(`Could not load chat titles (${response.status}).`)
       const page = await response.json()
       for (const item of Array.isArray(page.items) ? page.items : []) {
-        if (item?.id) chatTitleCache.set(String(item.id), String(item.title || 'Untitled chat'))
+        if (item?.id) nextTitles.set(String(item.id), String(item.title || 'Untitled chat'))
       }
       cursor = page.next_cursor
     } while (cursor !== null && cursor !== undefined)
+    chatTitleCache = nextTitles
     chatTitlePermission = 'allowed'
     return { permission: 'allowed', titles: chatTitleCache }
   })().finally(() => { chatTitlesPromise = null })

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { CheckIcon, ChevronDownIcon } from './Icons.jsx'
 
@@ -16,18 +16,21 @@ function formatBytes(value) {
 }
 
 export function VersionTimeline({ versions, currentVersion, selectedVersion, onSelect }) {
-  const ordered = [...(Array.isArray(versions) ? versions : [])]
-    .sort((a, b) => Number(b.v) - Number(a.v))
-  if (!ordered.length) return null
+  const [expanded, setExpanded] = useState(false)
+  const items = Array.isArray(versions) ? versions : []
+  if (!items.length) return null
+  const ordered = expanded
+    ? [...items].sort((a, b) => Number(b.v) - Number(a.v))
+    : null
 
   return (
-    <details className="af-disc">
+    <details className="af-disc" onToggle={(event) => setExpanded(event.currentTarget.open)}>
       <summary>
         <span>Version history</span>
-        <span className="af-disc-count">{ordered.length}</span>
+        <span className="af-disc-count">{items.length}</span>
         <ChevronDownIcon className="af-disc-chevron" size={18} />
       </summary>
-      <div className="af-timeline">
+      {expanded && <div className="af-timeline">
         {ordered.map((item) => {
           const selected = Number(item.v) === Number(selectedVersion)
           return (
@@ -52,7 +55,7 @@ export function VersionTimeline({ versions, currentVersion, selectedVersion, onS
             </button>
           )
         })}
-      </div>
+      </div>}
     </details>
   )
 }

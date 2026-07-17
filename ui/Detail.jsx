@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { shareNeedsUpdate, publishedShare, stoppedShare, versionPath } from '../domain.js'
+import { artifactFilename, shareNeedsUpdate, publishedShare, stoppedShare, versionPath } from '../domain.js'
 import { loadChatTitles } from '../storage.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
 import { VersionTimeline } from './VersionTimeline.jsx'
-import { DeleteSheet, ShareSheet } from './ShareSheet.jsx'
+import { ArtifactOptionsSheet, DeleteSheet, ShareSheet } from './ShareSheet.jsx'
 import {
   ArrowLeftIcon,
   ChatIcon,
@@ -22,14 +22,38 @@ function toPublicUrl(value) {
   try { return new URL(value, window.location.origin).href } catch { return String(value || '') }
 }
 
+const TOO_LARGE_MESSAGE = 'This artifact is too large to share — ask the agent to trim it.'
+
+function isPayloadTooLarge(error) {
+  return Number(error?.status || error?.response?.status) === 413
+    || /\b413\b/.test(String(error?.message || ''))
+}
+
+function shareFailureMessage(error, fallback) {
+  if (error?.userMessage) return error.userMessage
+  if (isPayloadTooLarge(error)) return TOO_LARGE_MESSAGE
+  return error?.message || fallback
+}
+
+function compensatedError(message, cause) {
+  const error = new Error(message)
+  error.status = cause?.status
+  error.userMessage = message
+  return error
+}
+
 export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
   const [record, setRecord] = useState(null)
   const [share, setShare] = useState(null)
   const [status, setStatus] = useState('loading')
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [reloadTick, setReloadTick] = useState(0)
+  const [sourceReloadTick, setSourceReloadTick] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
+  const [viewMode, setViewMode] = useState('preview')
+  const [sourceState, setSourceState] = useState({ key: '', status: 'idle', html: '', message: '' })
   const [shareOpen, setShareOpen] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState(null)
@@ -51,6 +75,8 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
     let refreshing = false
     setStatus('loading')
     setSelectedVersion(null)
+    setViewMode('preview')
+    setSourceState({ key: '', status: 'idle', html: '', message: '' })
     const recordPath = `artifacts/${artifactId}.json`
     const sharePath = `shares/${artifactId}.json`
     const acceptRecord = (value) => {
@@ -125,8 +151,30 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
 
   const currentVersion = Number(record?.current_version) || 1
   const previewVersion = selectedVersion || currentVersion
+  const sourceKey = record ? `${record.id}:${previewVersion}` : ''
   const publicShare = useMemo(() => share ? { ...share, url: toPublicUrl(share.url) } : null, [share])
   const needsUpdate = shareNeedsUpdate(record, share)
+
+  useEffect(() => {
+    if (viewMode !== 'source' || !record) return undefined
+    let active = true
+    setSourceState({ key: sourceKey, status: 'loading', html: '', message: '' })
+    storage.getText(versionPath(record.id, previewVersion))
+      .then((html) => {
+        if (!active) return
+        if (html == null) throw new Error(`Version ${previewVersion} is missing.`)
+        setSourceState({ key: sourceKey, status: 'ready', html, message: '' })
+      })
+      .catch((error) => {
+        if (active) setSourceState({
+          key: sourceKey,
+          status: 'error',
+          html: '',
+          message: error?.message || 'Source could not be loaded.',
+        })
+      })
+    return () => { active = false }
+  }, [previewVersion, record?.id, sourceKey, sourceReloadTick, storage, viewMode])
 
   const toggleFullscreen = useCallback(async () => {
     if (fullscreen) {
@@ -155,13 +203,24 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
     }
   }, [fullscreen, showToast])
 
+  async function readVersionHtml(version) {
+    const html = await storage.getText(versionPath(record.id, version))
+    if (html == null) throw new Error(`Version ${version} is missing.`)
+    return html
+  }
+
+  async function stageVersion(version) {
+    const html = await readVersionHtml(version)
+    await storage.removeFolder(`projects/${record.id}/build/site`)
+    await storage.setText(`projects/${record.id}/build/site/index.html`, html)
+  }
+
   async function publish(version) {
     if (!record || busy) return
     setBusy('publish')
+    const previousShare = share?.published ? share : null
     try {
-      const html = await storage.getText(versionPath(record.id, version))
-      if (html == null) throw new Error(`Version ${version} is missing.`)
-      await storage.setText(`projects/${record.id}/build/site/index.html`, html)
+      await stageVersion(version)
       const result = await storage.publish(record.id)
       const next = publishedShare({
         id: record.id,
@@ -169,11 +228,51 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
         token: result.token,
         url: result.url,
       })
-      await storage.setJSON(`shares/${record.id}.json`, next)
+      try {
+        await storage.setJSON(`shares/${record.id}.json`, next)
+      } catch (persistenceError) {
+        const tooLarge = isPayloadTooLarge(persistenceError)
+        if (previousShare) {
+          try {
+            await stageVersion(previousShare.shared_version)
+            await storage.publish(record.id)
+          } catch {
+            throw compensatedError(
+              tooLarge
+                ? `${TOO_LARGE_MESSAGE} The previous public snapshot could not be restored.`
+                : 'The shared version could not be saved, and the previous public snapshot could not be restored.',
+              persistenceError,
+            )
+          }
+          throw compensatedError(
+            tooLarge
+              ? `${TOO_LARGE_MESSAGE} The previous shared version is still live.`
+              : 'The shared version could not be saved. The previous shared version is still live.',
+            persistenceError,
+          )
+        }
+        try {
+          await storage.unpublish(record.id)
+        } catch {
+          setShare(next)
+          throw compensatedError(
+            tooLarge
+              ? `${TOO_LARGE_MESSAGE} The new public link could not be removed; try Stop sharing.`
+              : 'Share state could not be saved, and the new public link could not be removed. Try Stop sharing.',
+            persistenceError,
+          )
+        }
+        throw compensatedError(
+          tooLarge
+            ? `${TOO_LARGE_MESSAGE} The new public link was removed.`
+            : 'Share state could not be saved, so the new public link was removed.',
+          persistenceError,
+        )
+      }
       setShare(next)
-      showToast(share?.published ? `Shared version updated to v${version}.` : 'Public link created.', 'success')
+      showToast(previousShare ? `Shared version updated to v${version}.` : 'Public link created.', 'success')
     } catch (error) {
-      showToast(error?.message || 'Artifact could not be shared.', 'error')
+      showToast(shareFailureMessage(error, 'Artifact could not be shared.'), 'error')
     } finally {
       setBusy('')
     }
@@ -189,7 +288,7 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
       setShare(next)
       showToast('Public link removed.', 'success')
     } catch (error) {
-      showToast(error?.message || 'Sharing could not be stopped.', 'error')
+      showToast(shareFailureMessage(error, 'Sharing could not be stopped.'), 'error')
     } finally {
       setBusy('')
     }
@@ -206,19 +305,61 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
     }
   }
 
+  async function selectedHtml() {
+    if (sourceState.key === sourceKey && sourceState.status === 'ready') return sourceState.html
+    return readVersionHtml(previewVersion)
+  }
+
+  async function copyHtml() {
+    if (!record || busy) return
+    setBusy('copy')
+    try {
+      const html = await selectedHtml()
+      await navigator.clipboard.writeText(html)
+      setOptionsOpen(false)
+      showToast('Copied.', 'success')
+    } catch {
+      showToast('Copy is unavailable. Switch to Source and select the HTML.', 'error')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function downloadHtml() {
+    if (!record || busy) return
+    setBusy('download')
+    try {
+      const html = await selectedHtml()
+      const blob = new Blob([html], { type: 'application/octet-stream' })
+      const objectUrl = URL.createObjectURL(blob)
+      try {
+        const anchor = document.createElement('a')
+        anchor.href = objectUrl
+        anchor.download = artifactFilename(record.title, previewVersion)
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+      } finally {
+        URL.revokeObjectURL(objectUrl)
+      }
+      setOptionsOpen(false)
+      showToast('Download started.', 'success')
+    } catch (error) {
+      showToast(error?.message || 'HTML could not be downloaded.', 'error')
+    } finally {
+      setBusy('')
+    }
+  }
+
   async function deleteArtifact() {
     if (!record || busy) return
     setBusy('delete')
     try {
-      await storage.unpublish(record.id)
-      const results = await Promise.allSettled([
-        storage.removeFolder(`versions/${record.id}`),
-        storage.removeFolder(`projects/${record.id}`),
-        storage.remove(`shares/${record.id}.json`),
-        storage.remove(`artifacts/${record.id}.json`),
-      ])
-      const failed = results.find((result) => result.status === 'rejected')
-      if (failed) throw failed.reason
+      if (share?.published) await storage.unpublish(record.id)
+      await storage.removeFolder(`versions/${record.id}`)
+      await storage.removeFolder(`projects/${record.id}`)
+      await storage.remove(`shares/${record.id}.json`)
+      await storage.remove(`artifacts/${record.id}.json`)
       onDeleted(record.id)
     } catch (error) {
       showToast(error?.message || 'Artifact could not be deleted.', 'error')
@@ -273,20 +414,50 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
       <header className="af-detail-header">
         <button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={onClose} aria-label="Back to artifacts"><ArrowLeftIcon /></button>
         <div className="af-detail-heading"><h1>{record.title || 'Untitled artifact'}</h1><span>v{currentVersion}</span></div>
-        <button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={() => setDeleteOpen(true)} aria-label="Artifact options"><MoreIcon /></button>
+        <button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={() => setOptionsOpen(true)} aria-label="Artifact options"><MoreIcon /></button>
       </header>
 
       <main className="af-detail-scroll">
         <div className="af-detail-page">
           <div className={`af-preview-shell${fullscreen ? ' is-fullscreen' : ''}`}>
             <div className="af-preview-toolbar">
-              <span>Previewing v{previewVersion}</span>
-              <div>
-                <button className="af-btn af-btn-icon af-preview-tool" type="button" onClick={() => setReloadTick((n) => n + 1)} aria-label="Reload preview"><ReloadIcon size={17} /></button>
-                <button className="af-btn af-btn-icon af-preview-tool" type="button" onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen preview' : 'Open fullscreen preview'}><ExpandIcon size={17} /></button>
+              <div className="af-preview-context">
+                <span>Version v{previewVersion}</span>
+                <div className="af-segment" role="group" aria-label="Artifact view">
+                  <button className={viewMode === 'preview' ? 'is-selected' : ''} type="button" aria-pressed={viewMode === 'preview'} onClick={() => setViewMode('preview')}>Preview</button>
+                  <button className={viewMode === 'source' ? 'is-selected' : ''} type="button" aria-pressed={viewMode === 'source'} onClick={() => setViewMode('source')}>Source</button>
+                </div>
+              </div>
+              <div className="af-preview-tools">
+                <button
+                  className="af-btn af-btn-icon af-preview-tool"
+                  type="button"
+                  onClick={() => viewMode === 'source' ? setSourceReloadTick((n) => n + 1) : setReloadTick((n) => n + 1)}
+                  aria-label={viewMode === 'source' ? 'Reload source' : 'Reload preview'}
+                >
+                  <ReloadIcon size={17} />
+                </button>
+                <button className="af-btn af-btn-icon af-preview-tool" type="button" onClick={toggleFullscreen} aria-label={fullscreen ? `Exit fullscreen ${viewMode}` : `Open fullscreen ${viewMode}`}><ExpandIcon size={17} /></button>
               </div>
             </div>
-            <ArtifactFrame artifactId={record.id} version={previewVersion} storage={storage} reloadTick={reloadTick} fullscreen={fullscreen} />
+            {viewMode === 'preview'
+              ? <ArtifactFrame artifactId={record.id} version={previewVersion} storage={storage} reloadTick={reloadTick} fullscreen={fullscreen} />
+              : (
+                <div className="af-source" aria-label={`HTML source, version ${previewVersion}`}>
+                  {(sourceState.key !== sourceKey || sourceState.status === 'loading') && (
+                    <div className="af-source-state" aria-label="Loading artifact source"><div className="af-skeleton af-skeleton-window" /></div>
+                  )}
+                  {sourceState.key === sourceKey && sourceState.status === 'error' && (
+                    <div className="af-preview-error" role="status">
+                      <div className="af-preview-error-mark" aria-hidden="true">!</div>
+                      <strong>Source unavailable</strong>
+                      <p>{sourceState.message}</p>
+                      <button className="af-btn af-btn-secondary" type="button" onClick={() => setSourceReloadTick((n) => n + 1)}><ReloadIcon size={17} /> Reload</button>
+                    </div>
+                  )}
+                  {sourceState.key === sourceKey && sourceState.status === 'ready' && <pre><code>{sourceState.html}</code></pre>}
+                </div>
+              )}
           </div>
 
           <section className="af-detail-meta" aria-label="Artifact information">
@@ -314,6 +485,17 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
       </main>
 
       <ShareSheet open={shareOpen} artifact={record} share={publicShare} busy={Boolean(busy)} needsUpdate={needsUpdate} onClose={() => setShareOpen(false)} onPublish={publish} onCopy={copyLink} onStop={stopSharing} />
+      <ArtifactOptionsSheet
+        open={optionsOpen}
+        busy={Boolean(busy)}
+        onClose={() => setOptionsOpen(false)}
+        onCopy={copyHtml}
+        onDownload={downloadHtml}
+        onDelete={() => {
+          setOptionsOpen(false)
+          setDeleteOpen(true)
+        }}
+      />
       <DeleteSheet open={deleteOpen} title={record.title} busy={busy === 'delete'} onClose={() => setDeleteOpen(false)} onDelete={deleteArtifact} />
       {toast && <div className={`af-toast${toast.tone ? ` is-${toast.tone}` : ''}`} role="status" key={toast.key}>{toast.message}</div>}
     </div>

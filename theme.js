@@ -256,7 +256,30 @@ export const CSS = `
   font: 550 0.75rem/1 var(--mono);
   font-variant-numeric: tabular-nums;
 }
-.af-preview-toolbar > div { display: flex; align-items: center; gap: 0.125rem; }
+.af-preview-context { display: flex; min-width: 0; align-items: center; gap: 0.625rem; }
+.af-preview-context > span { flex: 0 0 auto; }
+.af-preview-tools { display: flex; align-items: center; gap: 0.125rem; }
+.af-segment {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--surface);
+}
+.af-segment button {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  font: 650 0.8125rem/1 var(--font);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.af-segment button:hover { color: var(--text); }
+.af-segment button.is-selected { background: var(--accent-dim); color: var(--accent); }
 .af-preview-tool { border-color: transparent; background: transparent; color: var(--muted); }
 .af-preview-tool:hover { background: var(--accent-dim); color: var(--text); }
 .af-preview {
@@ -268,6 +291,20 @@ export const CSS = `
 }
 .af-preview-frame { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
 .af-preview-loading { position: absolute; inset: 0; }
+.af-source { flex: 1; min-height: 0; overflow: auto; background: var(--bg); }
+.af-source pre {
+  min-width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 1rem;
+  color: var(--text);
+  font: 500 0.75rem/1.55 var(--mono);
+  tab-size: 2;
+  white-space: pre;
+}
+.af-source code { font: inherit; }
+.af-source-state { height: 100%; }
 .af-preview-error {
   display: flex;
   width: 100%;
@@ -400,6 +437,32 @@ export const CSS = `
 .af-sheet-actions > .af-btn { flex: 1; }
 .af-sheet-actions.is-stacked { flex-direction: column; }
 .af-sheet-actions.is-stacked > .af-btn { flex: none; }
+.af-option-list { display: flex; flex-direction: column; margin-top: 0.75rem; }
+.af-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 4rem;
+  padding: 0.625rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-family: var(--font);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.af-option:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.af-option:disabled { opacity: 0.5; cursor: default; }
+.af-option:last-child { border-bottom: 0; }
+.af-option > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 0.1875rem; }
+.af-option strong { font-size: 0.9375rem; line-height: 1.3; font-weight: 660; }
+.af-option small { color: var(--muted); font-size: 0.75rem; line-height: 1.35; }
+.af-option-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; flex: 0 0 auto; border-radius: 0.6875rem; background: var(--surface2); color: var(--accent); }
+.af-option.is-danger { color: var(--danger); }
+.af-option.is-danger .af-option-icon { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 @keyframes af-fade-in { from { opacity: 0; } }
 @keyframes af-sheet-in { from { opacity: 0.75; transform: translateY(1.5rem); } }
 /* /mobius-ui:Sheet */
@@ -445,6 +508,12 @@ export const CSS = `
 
 @media (max-height: 36rem) {
   .af-preview-shell { height: 50dvh; min-height: 15rem; }
+}
+
+@media (max-width: 29rem) {
+  .af-preview-toolbar { align-items: stretch; flex-direction: column; padding: 0.375rem; }
+  .af-preview-context { justify-content: space-between; }
+  .af-preview-tools { justify-content: flex-end; }
 }
 
 /* mobius-ui:ReducedMotion — app-owned. */

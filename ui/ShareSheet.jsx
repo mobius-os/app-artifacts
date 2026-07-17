@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import { ArrowUpRightIcon, CopyIcon, ShareIcon } from './Icons.jsx'
+import { ArrowUpRightIcon, CopyIcon, DownloadIcon, ShareIcon, TrashIcon } from './Icons.jsx'
 
 function useSheetFocus(open, busy, onClose) {
   const sheetRef = useRef(null)
@@ -107,6 +107,50 @@ export function ShareSheet({
             </button>
           )}
           <button className="af-btn af-btn-ghost af-btn-block" type="button" onClick={onClose} disabled={busy}>Done</button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+export function ArtifactOptionsSheet({
+  open,
+  busy,
+  onClose,
+  onCopy,
+  onDownload,
+  onDelete,
+}) {
+  const sheetRef = useSheetFocus(open, busy, onClose)
+  if (!open) return null
+  return (
+    <div className="af-scrim" role="presentation" onClick={busy ? undefined : onClose}>
+      <section
+        ref={sheetRef}
+        className="af-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="af-options-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="af-sheet-handle" aria-hidden="true" />
+        <h2 id="af-options-title">Artifact options</h2>
+        <div className="af-option-list">
+          <button className="af-option" type="button" onClick={onCopy} disabled={busy}>
+            <span className="af-option-icon" aria-hidden="true"><CopyIcon /></span>
+            <span><strong>Copy HTML</strong><small>Copy the selected version as plain text</small></span>
+          </button>
+          <button className="af-option" type="button" onClick={onDownload} disabled={busy}>
+            <span className="af-option-icon" aria-hidden="true"><DownloadIcon /></span>
+            <span><strong>Download HTML (includes scripts)</strong><small>Scripts may run when the downloaded file is opened</small></span>
+          </button>
+          <button className="af-option is-danger" type="button" onClick={onDelete} disabled={busy}>
+            <span className="af-option-icon" aria-hidden="true"><TrashIcon /></span>
+            <span><strong>Delete…</strong><small>Remove every version and public share</small></span>
+          </button>
+        </div>
+        <div className="af-sheet-actions">
+          <button className="af-btn af-btn-secondary" type="button" onClick={onClose} disabled={busy}>Done</button>
         </div>
       </section>
     </div>
