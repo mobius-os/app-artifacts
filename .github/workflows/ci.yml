@@ -46,5 +46,8 @@ jobs:
           MOBIUS_FRONTEND_NODE_MODULES: ${{ github.workspace }}/.mobius/frontend/node_modules
         run: npm test --if-present
 
+      - name: Compile smoke
+        run: npm run smoke
+
       - name: Verify mobius package
         run: npm run verify:mobius --if-present

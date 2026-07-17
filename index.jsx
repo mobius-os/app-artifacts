@@ -53,7 +53,7 @@ export default function ArtifactsApp({ appId, token }) {
   const startChat = useCallback(() => {
     window.parent.postMessage({
       type: 'moebius:new-chat',
-      draft: 'Build an interactive HTML artifact for me.',
+      draft: 'Build an artifact for me: an interactive page, a visualization, or a polished document.',
     }, '*')
   }, [])
 

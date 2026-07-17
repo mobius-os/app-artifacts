@@ -1,8 +1,8 @@
 {
   "id": "artifacts",
   "name": "Artifacts",
-  "version": "0.1.0",
-  "description": "Browse, preview, version, and share interactive HTML artifacts created in Möbius chats.",
+  "version": "0.2.0",
+  "description": "Browse, preview, version, share, view, copy, and download interactive pages and polished documents created in Möbius chats.",
   "author": "mobius-os",
   "license": "MIT",
   "homepage": "https://github.com/mobius-os/app-artifacts",
