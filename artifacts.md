@@ -1,27 +1,32 @@
 # Building artifacts
 
-An artifact is a single self-contained interactive HTML page — a chart, a
-calculator, a small game, an animated explainer — that the partner can open,
-version, and share from the Artifacts app. You build the page; the Artifacts
-app is its gallery: it shows which chat each artifact came from, its version
-history, a live preview, and a public share button. This file is the source of
-truth for how artifacts are stored and linked. Read this before building
-anything you would call an artifact, canvas, visualization, or shareable page —
-and before iterating on one that already exists.
+An artifact is a single self-contained HTML page — interactive (a chart,
+calculator, small game, animated explainer) or a polished document (a report,
+write-up, brief, or code explanation) — that the partner can open, version, and
+share from the Artifacts app. You build the page; the Artifacts app is its
+gallery: it shows which chat each artifact came from, its version history, a
+live preview, and a public share button. This file is the source of truth for
+how artifacts are stored and linked. Read this before building anything you
+would call an artifact, canvas, visualization, report, or shareable page — and
+before iterating on one that already exists.
 
 ---
 
 ## Artifact or mini-app?
 
+Reach for an artifact when the thing is **significant and self-contained** —
+substantial enough to stand on its own (a rule of thumb: more than a dozen
+lines, not a one-liner you'd just put in the chat).
+
 | Build an ARTIFACT when… | Build a MINI-APP when… |
 |---|---|
-| It is a self-contained page to look at, play with, or share — a viz, report, calculator, infographic, small game | It is a durable tool the partner returns to, with saved records and its own data model |
+| It is a self-contained page to look at, play with, read, or share — a viz, report, calculator, infographic, small game, document | It is a durable tool the partner returns to, with saved records and its own data model |
 | It needs no storage, no embedded chat, no cron — the page IS the product | It needs `window.mobius` storage, notifications, schedules, or registration |
 | A logged-out person you share it with should be able to use it | It only makes sense inside Möbius |
 
 When genuinely unsure, name both options in your clarifying turn and let the
 partner pick. An artifact is much cheaper — prefer it for one-shot interactive
-content.
+content and for standalone documents.
 
 ---
 
@@ -58,10 +63,12 @@ for public sharing. Sharing is the partner's action, taken in the app.
 
 ## Create an artifact
 
-1. Author the page (rules in the next section) and save it to a temp file.
+1. Author the page (rules below) and save it to a temp file.
 2. Mint the id: slugified title + 4 random hex, all `[a-z0-9-]`, ≤ 45 chars
    total — e.g. `"Tip Calculator"` → `tip-calculator-7f3a`.
-3. Write the version blob and the record:
+3. Write the version blob, then the record. **Write the record atomically**
+   (temp file + `os.replace`) so the app's live gallery never reads a
+   half-written file:
 
 ```bash
 AID="tip-calculator-$(openssl rand -hex 2)"
@@ -72,7 +79,9 @@ mkdir -p "$D/versions/$AID" "$D/artifacts"
 cp page.html "$D/versions/$AID/v1.html"          # immutable once written
 
 python3 - "$D/artifacts/$AID.json" <<PY
-import json, sys
+import json, os, sys
+path = sys.argv[1]
+tmp = path + ".tmp"
 json.dump({
   "id": "$AID", "title": "Tip Calculator",
   "description": "Split a bill and compute per-person tips.",
@@ -82,7 +91,8 @@ json.dump({
   "versions": [{"v": 1, "created_at": "$NOW", "chat_id": "$CHAT_ID",
                 "note": "first version",
                 "bytes": $(wc -c < "$D/versions/$AID/v1.html")}],
-}, open(sys.argv[1], "w"))
+}, open(tmp, "w"))
+os.replace(tmp, path)                        # atomic swap — no torn reads
 PY
 ```
 
@@ -90,7 +100,9 @@ Stamp `$CHAT_ID` exactly as shown — it is how the partner gets the
 "open the chat this came from" link. If you prefer HTTP, the equivalent is
 `PUT $API_BASE_URL/api/storage/apps/$ARTIFACTS_APP_ID/<path>` with
 `Bearer $AGENT_TOKEN` (`.html` → `Content-Type: text/html` raw body; `.json` →
-`application/json`, the body IS the document, no envelope).
+`application/json`, the body IS the document, no envelope). The HTTP PUT path
+writes atomically on the server and enforces the storage quota, so it is the
+safer choice for large pages.
 
 ---
 
@@ -102,27 +114,30 @@ Find the id first: it is in your earlier reply's link, or list
 1. **Reuse the same `artifact_id`** — a new id would create a second artifact
    instead of a new version.
 2. **Never overwrite an existing `v<N>.html`** — history is immutable. Write
-   `v<N+1>.html`.
-3. Re-read the record fresh, append a `versions[]` entry (with this chat's
-   `$CHAT_ID` and a short human `note` of what changed), bump
-   `current_version` and `updated_at`, write it back.
+   the next free version number, and refuse to clobber if it already exists
+   (a concurrent turn may have taken it):
 
 ```bash
 REC="$D/artifacts/$AID.json"
 NEXT=$(python3 -c "import json; print(json.load(open('$REC'))['current_version']+1)")
-cp page.html "$D/versions/$AID/v$NEXT.html"
-python3 - "$REC" "$D/versions/$AID/v$NEXT.html" $NEXT "dark theme + rounding" <<'PY'
+DEST="$D/versions/$AID/v$NEXT.html"
+if [ -e "$DEST" ]; then echo "v$NEXT already exists — re-read the record and retry"; exit 1; fi
+cp page.html "$DEST"
+python3 - "$REC" "$DEST" $NEXT "dark theme + rounding" <<'PY'
 import json, os, sys, datetime
 rec, blob, nxt, note = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
-d = json.load(open(rec))
+d = json.load(open(rec))                     # re-read fresh, then append
 now = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 d["current_version"] = nxt; d["updated_at"] = now
 d["versions"].append({"v": nxt, "created_at": now,
   "chat_id": os.environ.get("CHAT_ID", ""), "note": note,
   "bytes": os.path.getsize(blob)})
-json.dump(d, open(rec, "w"))
+tmp = rec + ".tmp"; json.dump(d, open(tmp, "w")); os.replace(tmp, rec)
 PY
 ```
+
+3. Read the record fresh before appending (a different chat may have added a
+   version) and bump `current_version` + `updated_at`.
 
 If the partner shared the artifact publicly, the shared page keeps showing the
 version it was shared at — tell them they can update the shared version from
@@ -146,10 +161,26 @@ the app's Share sheet.
   don't under-design the centerpiece. Real content throughout — never lorem.
 - **Robust.** Wrap risky JS in try/catch and render a visible fallback message;
   a crashed artifact must not be a blank page.
-- **Lean.** Stay far under the 50 MB per-file cap; prefer SVG and generated
-  canvas over big base64 blobs.
+- **Lean.** Keep the file well under 50 MB (large `data:` assets count) — the
+  storage tree is capped at 1 GB; prefer SVG and generated canvas over big
+  base64 blobs.
 - **Title it like a product** ("Berlin Marathon Pacing", not "chart-v2") and
   give the record a one-line description — both show in the gallery.
+
+### Documents and reports
+
+A report, brief, write-up, or code explanation is a first-class artifact.
+Render it as **semantic, self-contained HTML** — `<article>`, real headings,
+paragraphs, lists, tables, links, and `<pre><code>` for code — with readable
+typography and selectable text. Don't invent interactivity a document doesn't
+need. Storage stays `.html` like any other artifact.
+
+### Diagrams
+
+Pre-render diagrams and flowcharts as accessible inline `<svg>` with a `<title>`
+and `<desc>`. Do not emit raw Mermaid source and do not load Mermaid or any
+diagram library from a CDN — the sandbox blocks it and a shared page must work
+offline.
 
 ---
 
@@ -181,5 +212,5 @@ curl -fsS -X POST "$API_BASE_URL/api/notifications/send" \
 | Iterated one | Confirm `current_version` bumped and the new `v<N>.html` exists; say what changed; re-link it. If it was shared, mention the Share sheet can update the public version. |
 | Hit a gotcha | Log it the usual way so future-you avoids it. |
 
-Sharing, version browsing, and deletion are the partner's actions inside the
-Artifacts app — point them there rather than doing it for them.
+Sharing, version browsing, downloading, and deletion are the partner's actions
+inside the Artifacts app — point them there rather than doing it for them.
