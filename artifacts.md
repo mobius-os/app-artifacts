@@ -1,14 +1,23 @@
 # Building artifacts
 
 An artifact is a single self-contained HTML page — interactive (a chart,
-calculator, small game, animated explainer) or a polished document (a report,
-write-up, brief, or code explanation) — that the partner can open, version, and
-share from the Artifacts app. You build the page; the Artifacts app is its
-gallery: it shows which chat each artifact came from, its version history, a
-live preview, and a public share button. This file is the source of truth for
-how artifacts are stored and linked. Read this before building anything you
-would call an artifact, canvas, visualization, report, or shareable page — and
-before iterating on one that already exists.
+calculator, small game, animated explainer), a design mockup (a proposed UI, a
+flow diagram, an interactive explainer of a tradeoff), or a polished document (a
+report, write-up, brief, or code explanation) — that the partner can open,
+version, and share from the Artifacts app. You build the page; the Artifacts app
+is its gallery: it shows which chat each artifact came from, its version
+history, a live preview, and a public share button. This file is the source of
+truth for how artifacts are stored and linked. Read this before building
+anything you would call an artifact, canvas, visualization, mockup, report, or
+shareable page — and before iterating on one that already exists.
+
+**Offer one proactively when a visual would help.** Don't wait to be asked. When
+you're designing a feature, proposing a UI, explaining how a system works, or
+weighing options, and you're confident a mockup, diagram, or small interactive
+demo would make it materially clearer or quicker for the partner to react to —
+offer to build it as an artifact rather than describing it in prose alone. The
+bar is genuine help (a decision sharpened, a round-trip saved), not decorating
+every answer.
 
 ---
 
@@ -20,7 +29,7 @@ lines, not a one-liner you'd just put in the chat).
 
 | Build an ARTIFACT when… | Build a MINI-APP when… |
 |---|---|
-| It is a self-contained page to look at, play with, read, or share — a viz, report, calculator, infographic, small game, document | It is a durable tool the partner returns to, with saved records and its own data model |
+| It is a self-contained page to look at, play with, read, or share — a viz, mockup, UI design, diagram, report, calculator, infographic, small game, document | It is a durable tool the partner returns to, with saved records and its own data model |
 | It needs no storage, no embedded chat, no cron — the page IS the product | It needs `window.mobius` storage, notifications, schedules, or registration |
 | A logged-out person you share it with should be able to use it | It only makes sense inside Möbius |
 

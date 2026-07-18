@@ -14,7 +14,7 @@ async function readFolder(storage, prefix) {
   return values.filter((value) => value && typeof value === 'object')
 }
 
-export function Gallery({ storage, onOpen, onStartChat }) {
+export function Gallery({ storage, onOpen }) {
   const [artifacts, setArtifacts] = useState([])
   const [shares, setShares] = useState(new Map())
   const [status, setStatus] = useState('loading')
@@ -89,7 +89,7 @@ export function Gallery({ storage, onOpen, onStartChat }) {
             </div>
           )}
           {status === 'error' && <LoadError message={error} onRetry={load} />}
-          {status === 'ready' && artifacts.length === 0 && <Empty onStartChat={onStartChat} />}
+          {status === 'ready' && artifacts.length === 0 && <Empty />}
           {status === 'ready' && artifacts.length > 0 && (
             <div className="af-card-list">
               {artifacts.map((artifact) => (

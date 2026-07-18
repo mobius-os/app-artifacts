@@ -1,17 +1,14 @@
 import React from 'react'
-import { ArtifactIcon, ChatIcon } from './Icons.jsx'
+import { ArtifactIcon } from './Icons.jsx'
 
-export function Empty({ onStartChat }) {
+export function Empty() {
   return (
     <div className="af-empty">
       <div className="af-empty-mark" aria-hidden="true"><ArtifactIcon size={30} /></div>
       <h2 className="af-empty-title">Your artifacts will live here</h2>
       <p className="af-empty-text">
-        Ask the agent in any chat to build an interactive page, a visualization, or a polished document or report.
+        Ask the agent in any chat to build an interactive page, a visualization, or a polished document or report, and it will show up here to preview, version, and share.
       </p>
-      <button className="af-btn af-btn-primary" type="button" onClick={onStartChat}>
-        <ChatIcon size={18} /> Start a chat
-      </button>
     </div>
   )
 }

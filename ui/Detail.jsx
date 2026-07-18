@@ -11,7 +11,6 @@ import {
   MoreIcon,
   ReloadIcon,
   ShareIcon,
-  SparkIcon,
 } from './Icons.jsx'
 
 function postToShell(message) {
@@ -379,13 +378,6 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
     postToShell({ type: 'moebius:open-chat', chatId: record.chat_id })
   }
 
-  function askAgent() {
-    postToShell({
-      type: 'moebius:new-chat',
-      draft: `Please update the artifact “${record?.title || 'Untitled artifact'}” (artifact id: ${artifactId}).`,
-    })
-  }
-
   if (status === 'loading') {
     return <div className="af-detail-loading"><div className="af-skeleton af-skeleton-title" /><div className="af-skeleton af-skeleton-window" /></div>
   }
@@ -472,7 +464,6 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
           <section className="af-actions" aria-label="Artifact actions">
             <button className="af-action" type="button" onClick={() => setShareOpen(true)}><span className="af-action-icon"><ShareIcon /></span><span><strong>{share?.published ? 'Manage sharing' : 'Share'}</strong><small>{share?.published ? (needsUpdate ? `Update to v${currentVersion}` : 'Public link is current') : 'Publish a snapshot'}</small></span></button>
             <button className={`af-action${deletedChat ? ' is-disabled' : ''}`} type="button" aria-disabled={deletedChat} onClick={openOriginChat}><span className="af-action-icon"><ChatIcon /></span><span><strong>Open origin chat</strong><small>{deletedChat ? 'Chat deleted' : 'Return to the conversation'}</small></span></button>
-            <button className="af-action" type="button" onClick={askAgent}><span className="af-action-icon"><SparkIcon /></span><span><strong>Ask agent to change this</strong><small>Start with this artifact’s id</small></span></button>
           </section>
 
           <VersionTimeline

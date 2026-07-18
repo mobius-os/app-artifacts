@@ -1,14 +1,16 @@
 {
   "id": "artifacts",
   "name": "Artifacts",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Browse, preview, version, share, view, copy, and download interactive pages and polished documents created in Möbius chats.",
   "author": "mobius-os",
   "license": "MIT",
   "homepage": "https://github.com/mobius-os/app-artifacts",
   "entry": "index.jsx",
   "icon": "icon.png",
-  "skills": ["artifacts.md"],
+  "skills": [
+    "artifacts.md"
+  ],
   "permissions": {
     "chat_log_access": "summary"
   },

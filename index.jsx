@@ -50,19 +50,12 @@ export default function ArtifactsApp({ appId, token }) {
     try { navRef.current?.close?.() } catch {}
   }, [])
 
-  const startChat = useCallback(() => {
-    window.parent.postMessage({
-      type: 'moebius:new-chat',
-      draft: 'Build an artifact for me: an interactive page, a visualization, or a polished document.',
-    }, '*')
-  }, [])
-
   return (
     <div className="af-root">
       <style>{CSS}</style>
       {selectedId
         ? <Detail artifactId={selectedId} storage={storage} token={token} onClose={closeDetail} onDeleted={closeDetail} />
-        : <Gallery storage={storage} onOpen={openDetail} onStartChat={startChat} />}
+        : <Gallery storage={storage} onOpen={openDetail} />}
     </div>
   )
 }
