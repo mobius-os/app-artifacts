@@ -11,14 +11,6 @@ truth for how artifacts are stored and linked. Read this before building
 anything you would call an artifact, canvas, visualization, mockup, report, or
 shareable page — and before iterating on one that already exists.
 
-**Offer one proactively when a visual would help.** Don't wait to be asked. When
-you're designing a feature, proposing a UI, explaining how a system works, or
-weighing options, and you're confident a mockup, diagram, or small interactive
-demo would make it materially clearer or quicker for the partner to react to —
-offer to build it as an artifact rather than describing it in prose alone. The
-bar is genuine help (a decision sharpened, a round-trip saved), not decorating
-every answer.
-
 ---
 
 ## Artifact or mini-app?

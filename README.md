@@ -2,6 +2,8 @@
 
 Artifacts is the Möbius catalog for interactive HTML pages, visualizations, and polished documents created by the in-product agent. It gives owners one place to browse their artifacts, preview or inspect each version, copy or download its HTML, return to the originating chat, and publish a stable public snapshot.
 
+Artifacts ships an always-on prompt fragment that nudges the agent to offer visuals when they would help.
+
 ## What it does
 
 - Polls the app storage catalog while visible and reflects agent-created records without a reload.
