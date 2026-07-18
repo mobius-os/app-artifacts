@@ -5,6 +5,7 @@ import {
   artifactIntent,
   isValidArtifactStorageKey,
   planArtifactStorageRequest,
+  isTrustedArtifactStorageMessage,
 } from './domain.js'
 import { makeStorage } from './storage.js'
 import { CSS } from './theme.js'
@@ -144,6 +145,14 @@ export default function ArtifactsApp({ appId, token }) {
       if (!mounted || event.source !== mounted.frame.contentWindow) return
       const message = event.data
       if (message?.type !== 'moebius:artifact-storage') return
+      // A sandboxed frame may navigate ITSELF, and its contentWindow stays the
+      // same object, so event.source cannot tell the staged artifact apart from
+      // a page it navigated to. Both documents are opaque origins, so
+      // event.origin cannot either. The session key was injected into the
+      // staged document only, and a replacement document never saw it — so a
+      // navigated-away frame silently loses storage authority. Checked before
+      // any reply, since replies go to '*'.
+      if (!isTrustedArtifactStorageMessage(message, mounted)) return
       const requestId = typeof message.requestId === 'string' ? message.requestId : ''
       const nonce = typeof message.nonce === 'string' ? message.nonce : ''
       let plan

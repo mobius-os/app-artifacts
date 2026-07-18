@@ -33,15 +33,32 @@ export function ArtifactFrame({
     return () => { active = false }
   }, [artifactId, version, storage, reloadTick, localReload])
 
-  const previewHtml = useMemo(() => (
-    state.html == null
-      ? null
-      : injectArtifactStorageShim(state.html, { variant: 'preview', writable })
-  ), [state.html, writable])
+  // One key per staged document, handed to the parent bridge as this frame's
+  // proof of identity. Regenerated whenever the document is rebuilt, so a
+  // stale key cannot outlive the document it was minted for.
+  const preview = useMemo(() => {
+    if (state.html == null) return { html: null, sessionKey: '' }
+    const bytes = new Uint32Array(4)
+    try { crypto.getRandomValues(bytes) } catch {
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = Math.floor(Math.random() * 4294967296)
+      }
+    }
+    const sessionKey = Array.from(bytes, (n) => n.toString(36)).join('-')
+    return {
+      html: injectArtifactStorageShim(state.html, {
+        variant: 'preview', writable, sessionKey,
+      }),
+      sessionKey,
+    }
+  }, [state.html, writable])
+  const previewHtml = preview.html
 
   const registerFrame = useCallback((frame) => {
-    onPreviewFrame?.(frame, { artifactId, writable })
-  }, [artifactId, onPreviewFrame, writable])
+    onPreviewFrame?.(frame, {
+      artifactId, writable, sessionKey: preview.sessionKey,
+    })
+  }, [artifactId, onPreviewFrame, writable, preview.sessionKey])
 
   return (
     <div className={`af-preview${fullscreen ? ' is-fullscreen' : ''}`}>

@@ -169,7 +169,23 @@ export function artifactStorageContext({ variant, embedded = false, pathname = '
   return null
 }
 
-export function artifactStorageShimSource({ variant, writable = true } = {}) {
+/**
+ * Whether a bridge message really came from the document we staged.
+ *
+ * A sandboxed frame may navigate itself, and `contentWindow` stays the same
+ * object across that navigation, so `event.source` cannot distinguish the
+ * artifact we injected from a page it navigated to; both are opaque origins,
+ * so `event.origin` cannot either. The session key is minted per staged
+ * document and only ever written into that document, so a replacement never
+ * has it.
+ */
+export function isTrustedArtifactStorageMessage(message, mounted) {
+  const expected = mounted?.sessionKey
+  if (typeof expected !== 'string' || expected === '') return false
+  return message?.sessionKey === expected
+}
+
+export function artifactStorageShimSource({ variant, writable = true, sessionKey = '' } = {}) {
   if (variant !== 'preview' && variant !== 'published') {
     throw new Error('Artifact storage shim requires a known variant.')
   }
@@ -179,6 +195,11 @@ export function artifactStorageShimSource({ variant, writable = true } = {}) {
     maxPending: ARTIFACT_STORAGE_MAX_PENDING,
     variant,
     writable: variant === 'preview' && Boolean(writable),
+    // Issued by the parent for THIS mounted document. The frame's
+    // contentWindow survives a self-navigation, so event.source alone would
+    // keep trusting whatever page the artifact navigated itself to; a page
+    // that replaced this document never received this key.
+    sessionKey: variant === 'preview' ? String(sessionKey || '') : '',
   })
   return `(()=>{'use strict';
 var c=${config},w=window,p=w.parent,te=new TextEncoder(),pending=new Map(),seq=0;
@@ -189,7 +210,7 @@ function json(v,seen){if(v===null||typeof v==='string'||typeof v==='boolean')ret
 function value(v){if(!json(v))throw err('invalid-value','Artifact storage accepts JSON values only.');var raw=JSON.stringify(v);if(te.encode(raw).byteLength>c.maxBytes)throw err('value-too-large','Artifact storage value exceeds 64 KB.');return v}
 function id(){var a=new Uint32Array(4);try{w.crypto.getRandomValues(a)}catch{for(var i=0;i<a.length;i++)a[i]=Math.floor(Math.random()*4294967296)}return Array.from(a,function(n){return n.toString(36)}).join('-')}
 var nonce=id();
-function bridge(op,k,v){return new Promise(function(resolve,reject){if(p===w){reject(err('unavailable','Artifact storage preview bridge is unavailable.'));return}if(pending.size>=c.maxPending){reject(err('too-many-requests','Too many artifact storage requests.'));return}var requestId=(++seq).toString(36)+'-'+id(),done=false,timer=w.setTimeout(function(){if(done)return;done=true;pending.delete(requestId);reject(err('timeout','Artifact storage request timed out.'))},10000);pending.set(requestId,{nonce:nonce,finish:function(ok,result,error){if(done)return;done=true;w.clearTimeout(timer);pending.delete(requestId);ok?resolve(result):reject(err(error||'request-failed'))}});var message={type:'moebius:artifact-storage',op:op,requestId:requestId,nonce:nonce};if(k!==undefined)message.key=k;if(op==='set')message.value=v;try{p.postMessage(message,'*')}catch(e){var item=pending.get(requestId);if(item)item.finish(false,undefined,'request-failed')}})}
+function bridge(op,k,v){return new Promise(function(resolve,reject){if(p===w){reject(err('unavailable','Artifact storage preview bridge is unavailable.'));return}if(pending.size>=c.maxPending){reject(err('too-many-requests','Too many artifact storage requests.'));return}var requestId=(++seq).toString(36)+'-'+id(),done=false,timer=w.setTimeout(function(){if(done)return;done=true;pending.delete(requestId);reject(err('timeout','Artifact storage request timed out.'))},10000);pending.set(requestId,{nonce:nonce,finish:function(ok,result,error){if(done)return;done=true;w.clearTimeout(timer);pending.delete(requestId);ok?resolve(result):reject(err(error||'request-failed'))}});var message={type:'moebius:artifact-storage',op:op,requestId:requestId,nonce:nonce,sessionKey:c.sessionKey};if(k!==undefined)message.key=k;if(op==='set')message.value=v;try{p.postMessage(message,'*')}catch(e){var item=pending.get(requestId);if(item)item.finish(false,undefined,'request-failed')}})}
 function onResult(event){if(event.source!==p)return;var d=event.data;if(!d||d.type!=='moebius:artifact-storage-result'||typeof d.requestId!=='string')return;var item=pending.get(d.requestId);if(!item||d.nonce!==item.nonce)return;item.finish(d.ok===true,d.value,d.error)}
 function token(){var m=/^\\/sites\\/([a-f0-9]{16,64})(?:\\/|$)/.exec(w.location&&w.location.pathname||'');return m?m[1]:null}
 async function publicGet(k){var t=token();if(!t)throw err('unavailable','Artifact storage public context is unavailable.');try{var response=await w.fetch('/api/published-sites/'+encodeURIComponent(t)+'/data/'+encodeURIComponent(k),{cache:'no-store',credentials:'omit'});if(response.status===404)return null;if(!response.ok)throw err('request-failed','Artifact storage request failed ('+response.status+').');return await response.json()}catch(e){if(e&&e.code)throw e;throw err('network-error','Artifact storage request failed.') }}

@@ -14,6 +14,8 @@ import {
   makeArtifactRecord,
   nextVersion,
   planArtifactStorageRequest,
+  isTrustedArtifactStorageMessage,
+  artifactStorageShimSource,
   publishedArtifactToken,
   publishedShare,
   shareNeedsUpdate,
@@ -195,4 +197,50 @@ test('artifact storage injection preserves a leading doctype', () => {
   const injected = injectArtifactStorageShim(original, { variant: 'published' })
   assert.match(injected, /^<!-- built artifact --><!doctype html><script>/i)
   assert.match(injected, /<html><body>Hi<\/body><\/html>$/)
+})
+
+test('a frame that navigated away loses storage authority', () => {
+  // The artifact we staged holds the parent-issued session key. A page the
+  // frame navigated ITSELF to keeps the same contentWindow (so event.source
+  // still matches) but never received that key.
+  const mounted = { artifactId: 'deck-01', writable: true, sessionKey: 's3cr3t-key' }
+  const staged = {
+    type: 'moebius:artifact-storage',
+    op: 'set',
+    key: 'score',
+    requestId: 'r1',
+    nonce: 'n1',
+    sessionKey: 's3cr3t-key',
+  }
+  assert.equal(isTrustedArtifactStorageMessage(staged, mounted), true)
+
+  // Attacker page: right shape, guessed/absent key.
+  assert.equal(
+    isTrustedArtifactStorageMessage({ ...staged, sessionKey: 'guessed' }, mounted),
+    false,
+  )
+  const { sessionKey: _dropped, ...noKey } = staged
+  assert.equal(isTrustedArtifactStorageMessage(noKey, mounted), false)
+
+  // A mount with no key of its own must never be satisfiable.
+  for (const bad of [undefined, '', null, 0]) {
+    assert.equal(
+      isTrustedArtifactStorageMessage({ ...staged, sessionKey: bad },
+        { ...mounted, sessionKey: bad }),
+      false,
+    )
+  }
+})
+
+test('the preview shim sends the parent-issued session key on every request', () => {
+  const source = artifactStorageShimSource({
+    variant: 'preview', writable: true, sessionKey: 'mint-abc',
+  })
+  assert.match(source, /sessionKey:c\.sessionKey/)
+  assert.match(source, /"sessionKey":"mint-abc"/)
+  // A published page has no parent bridge, so it carries no key at all.
+  const published = artifactStorageShimSource({
+    variant: 'published', sessionKey: 'mint-abc',
+  })
+  assert.match(published, /"sessionKey":""/)
 })
