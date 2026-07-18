@@ -22,6 +22,10 @@ export function makeStorage(appId, token) {
   const runtime = (typeof window !== 'undefined' && window.mobius?.storage) || null
   const auth = { Authorization: `Bearer ${token}` }
 
+  function artifactDataUrl(artifactId, key) {
+    return `/api/apps/${encodeURIComponent(appId)}/artifact-data/${encodeURIComponent(artifactId)}/${encodeURIComponent(key)}`
+  }
+
   async function get(path) {
     if (runtime?.get) return runtime.get(path)
     const response = await fetch(`/api/storage/apps/${appId}/${path}`, { headers: auth })
@@ -135,6 +139,36 @@ export function makeStorage(appId, token) {
     }
   }
 
+  async function artifactDataGet(artifactId, key) {
+    const response = await fetch(artifactDataUrl(artifactId, key), { headers: auth })
+    if (response.status === 404) return null
+    if (!response.ok) {
+      throw await responseError(response, `Could not read artifact data (${response.status}).`)
+    }
+    return response.json()
+  }
+
+  async function artifactDataSet(artifactId, key, value) {
+    const response = await fetch(artifactDataUrl(artifactId, key), {
+      method: 'PUT',
+      headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify(value),
+    })
+    if (!response.ok) {
+      throw await responseError(response, `Could not save artifact data (${response.status}).`)
+    }
+  }
+
+  async function artifactDataRemove(artifactId, key) {
+    const response = await fetch(artifactDataUrl(artifactId, key), {
+      method: 'DELETE',
+      headers: auth,
+    })
+    if (!response.ok && response.status !== 404) {
+      throw await responseError(response, `Could not remove artifact data (${response.status}).`)
+    }
+  }
+
   return {
     get,
     getFresh,
@@ -147,6 +181,9 @@ export function makeStorage(appId, token) {
     removeFolder,
     publish,
     unpublish,
+    artifactDataGet,
+    artifactDataSet,
+    artifactDataRemove,
   }
 }
 

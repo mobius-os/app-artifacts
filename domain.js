@@ -1,6 +1,13 @@
 const ID_BASE_MAX = 40
 const ID_SUFFIX_RE = /^[0-9a-f]{4}$/
 const PROJECT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
+const ARTIFACT_STORAGE_KEY_RE = /^[a-z0-9._-]{1,64}$/
+const ARTIFACT_STORAGE_MESSAGE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
+const ARTIFACT_STORAGE_OPS = new Set(['get', 'set', 'remove', 'list'])
+
+export const ARTIFACT_STORAGE_INDEX_KEY = '__mobius_keys'
+export const ARTIFACT_STORAGE_MAX_VALUE_BYTES = 64 * 1024
+export const ARTIFACT_STORAGE_MAX_PENDING = 32
 
 function failureStatus(error) {
   const directStatus = Number(error?.status ?? error?.response?.status)
@@ -71,6 +78,138 @@ export function createArtifactId(title, suffixOrRandom = Math.random) {
 
 export function isValidProjectId(value) {
   return typeof value === 'string' && PROJECT_ID_RE.test(value)
+}
+
+export function isValidArtifactStorageKey(value) {
+  return typeof value === 'string'
+    && value !== ARTIFACT_STORAGE_INDEX_KEY
+    && ARTIFACT_STORAGE_KEY_RE.test(value)
+}
+
+function storageRequestError(code) {
+  const error = new Error(code)
+  error.bridgeError = code
+  return error
+}
+
+function isJsonValue(value, ancestors = new Set()) {
+  if (value === null) return true
+  if (typeof value === 'string' || typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (typeof value !== 'object' || ancestors.has(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return false
+  ancestors.add(value)
+  const valid = Array.isArray(value)
+    ? value.every((item) => isJsonValue(item, ancestors))
+    : Object.entries(value).every(([key, item]) => (
+      typeof key === 'string' && isJsonValue(item, ancestors)
+    ))
+  ancestors.delete(value)
+  return valid
+}
+
+export function jsonValueBytes(value) {
+  if (!isJsonValue(value)) return null
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength
+  } catch {
+    return null
+  }
+}
+
+export function planArtifactStorageRequest(message, context) {
+  if (!message || message.type !== 'moebius:artifact-storage') {
+    throw storageRequestError('invalid-request')
+  }
+  if (!ARTIFACT_STORAGE_MESSAGE_ID_RE.test(message.requestId || '')
+    || !ARTIFACT_STORAGE_MESSAGE_ID_RE.test(message.nonce || '')) {
+    throw storageRequestError('invalid-request')
+  }
+  if (!ARTIFACT_STORAGE_OPS.has(message.op)) throw storageRequestError('invalid-op')
+  if (!isValidProjectId(context?.artifactId)) throw storageRequestError('invalid-artifact')
+  if (message.op !== 'list' && !isValidArtifactStorageKey(message.key)) {
+    throw storageRequestError('invalid-key')
+  }
+  if ((message.op === 'set' || message.op === 'remove') && !context?.writable) {
+    throw storageRequestError('read-only')
+  }
+  if (message.op === 'set') {
+    const bytes = jsonValueBytes(message.value)
+    if (bytes === null) throw storageRequestError('invalid-value')
+    if (bytes > ARTIFACT_STORAGE_MAX_VALUE_BYTES) throw storageRequestError('value-too-large')
+  }
+  return {
+    artifactId: context.artifactId,
+    key: message.op === 'list' ? null : message.key,
+    nonce: message.nonce,
+    op: message.op,
+    requestId: message.requestId,
+    value: message.op === 'set' ? message.value : undefined,
+  }
+}
+
+export function publishedArtifactToken(pathname) {
+  const match = /^\/sites\/([a-f0-9]{16,64})(?:\/|$)/.exec(String(pathname || ''))
+  return match ? match[1] : null
+}
+
+export function artifactStorageContext({ variant, embedded = false, pathname = '' } = {}) {
+  if (variant === 'preview' && embedded) {
+    return { kind: 'preview', mode: 'editor', token: null, writable: true }
+  }
+  if (variant === 'published') {
+    return {
+      kind: 'published',
+      mode: 'public-readonly',
+      token: publishedArtifactToken(pathname),
+      writable: false,
+    }
+  }
+  return null
+}
+
+export function artifactStorageShimSource({ variant, writable = true } = {}) {
+  if (variant !== 'preview' && variant !== 'published') {
+    throw new Error('Artifact storage shim requires a known variant.')
+  }
+  const config = JSON.stringify({
+    indexKey: ARTIFACT_STORAGE_INDEX_KEY,
+    maxBytes: ARTIFACT_STORAGE_MAX_VALUE_BYTES,
+    maxPending: ARTIFACT_STORAGE_MAX_PENDING,
+    variant,
+    writable: variant === 'preview' && Boolean(writable),
+  })
+  return `(()=>{'use strict';
+var c=${config},w=window,p=w.parent,te=new TextEncoder(),pending=new Map(),seq=0;
+function err(code,message){var e=new Error(message||code);e.code=code;return e}
+function ro(){var e=err('read-only','Artifact storage is read-only.');e.name='ReadOnlyError';return e}
+function key(k){if(typeof k!=='string'||k===c.indexKey||!/^[a-z0-9._-]{1,64}$/.test(k))throw err('invalid-key','Invalid artifact storage key.');return k}
+function json(v,seen){if(v===null||typeof v==='string'||typeof v==='boolean')return true;if(typeof v==='number')return Number.isFinite(v);if(typeof v!=='object')return false;seen=seen||new Set();if(seen.has(v))return false;var proto=Object.getPrototypeOf(v);if(!Array.isArray(v)&&proto!==Object.prototype&&proto!==null)return false;seen.add(v);var ok=Array.isArray(v)?v.every(function(x){return json(x,seen)}):Object.keys(v).every(function(k){return json(v[k],seen)});seen.delete(v);return ok}
+function value(v){if(!json(v))throw err('invalid-value','Artifact storage accepts JSON values only.');var raw=JSON.stringify(v);if(te.encode(raw).byteLength>c.maxBytes)throw err('value-too-large','Artifact storage value exceeds 64 KB.');return v}
+function id(){var a=new Uint32Array(4);try{w.crypto.getRandomValues(a)}catch{for(var i=0;i<a.length;i++)a[i]=Math.floor(Math.random()*4294967296)}return Array.from(a,function(n){return n.toString(36)}).join('-')}
+var nonce=id();
+function bridge(op,k,v){return new Promise(function(resolve,reject){if(p===w){reject(err('unavailable','Artifact storage preview bridge is unavailable.'));return}if(pending.size>=c.maxPending){reject(err('too-many-requests','Too many artifact storage requests.'));return}var requestId=(++seq).toString(36)+'-'+id(),done=false,timer=w.setTimeout(function(){if(done)return;done=true;pending.delete(requestId);reject(err('timeout','Artifact storage request timed out.'))},10000);pending.set(requestId,{nonce:nonce,finish:function(ok,result,error){if(done)return;done=true;w.clearTimeout(timer);pending.delete(requestId);ok?resolve(result):reject(err(error||'request-failed'))}});var message={type:'moebius:artifact-storage',op:op,requestId:requestId,nonce:nonce};if(k!==undefined)message.key=k;if(op==='set')message.value=v;try{p.postMessage(message,'*')}catch(e){var item=pending.get(requestId);if(item)item.finish(false,undefined,'request-failed')}})}
+function onResult(event){if(event.source!==p)return;var d=event.data;if(!d||d.type!=='moebius:artifact-storage-result'||typeof d.requestId!=='string')return;var item=pending.get(d.requestId);if(!item||d.nonce!==item.nonce)return;item.finish(d.ok===true,d.value,d.error)}
+function token(){var m=/^\\/sites\\/([a-f0-9]{16,64})(?:\\/|$)/.exec(w.location&&w.location.pathname||'');return m?m[1]:null}
+async function publicGet(k){var t=token();if(!t)throw err('unavailable','Artifact storage public context is unavailable.');try{var response=await w.fetch('/api/published-sites/'+encodeURIComponent(t)+'/data/'+encodeURIComponent(k),{cache:'no-store',credentials:'omit'});if(response.status===404)return null;if(!response.ok)throw err('request-failed','Artifact storage request failed ('+response.status+').');return await response.json()}catch(e){if(e&&e.code)throw e;throw err('network-error','Artifact storage request failed.') }}
+function publicList(v){if(!Array.isArray(v))return [];return Array.from(new Set(v.filter(function(k){return typeof k==='string'&&k!==c.indexKey&&/^[a-z0-9._-]{1,64}$/.test(k)}))).sort()}
+var preview=c.variant==='preview'&&p!==w,published=c.variant==='published',storage;
+if(preview){w.addEventListener('message',onResult);storage={writable:c.writable,mode:'editor',get:function(k){try{return bridge('get',key(k))}catch(e){return Promise.reject(e)}},set:function(k,v){try{if(!c.writable)return Promise.reject(ro());return bridge('set',key(k),value(v))}catch(e){return Promise.reject(e)}},remove:function(k){try{if(!c.writable)return Promise.reject(ro());return bridge('remove',key(k))}catch(e){return Promise.reject(e)}},list:function(){return bridge('list')}}}
+else if(published){storage={writable:false,mode:'public-readonly',get:function(k){try{return publicGet(key(k))}catch(e){return Promise.reject(e)}},set:function(){return Promise.reject(ro())},remove:function(){return Promise.reject(ro())},list:async function(){var v=await publicGet(c.indexKey);return publicList(v)}}}
+else{storage={writable:false,mode:c.variant==='published'?'public-readonly':'editor',get:function(){return Promise.reject(err('unavailable'))},set:function(){return Promise.reject(c.variant==='published'?ro():err('unavailable'))},remove:function(){return Promise.reject(c.variant==='published'?ro():err('unavailable'))},list:function(){return Promise.reject(err('unavailable'))}}}
+var root=w.mobiusArtifact&&typeof w.mobiusArtifact==='object'?w.mobiusArtifact:{};Object.defineProperty(root,'storage',{value:Object.freeze(storage),enumerable:true,configurable:false,writable:false});w.mobiusArtifact=root;
+})();`
+}
+
+export function injectArtifactStorageShim(html, options) {
+  const source = artifactStorageShimSource(options).replace(/<\/script/gi, '<\\/script')
+  const script = `<script>${source}</script>`
+  const document = String(html ?? '')
+  const doctype = /^((?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>)/i.exec(document)
+  return doctype
+    ? `${doctype[1]}${script}${document.slice(doctype[1].length)}`
+    : `${script}${document}`
 }
 
 export function makeArtifactRecord({

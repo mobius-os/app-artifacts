@@ -22,12 +22,42 @@ lines, not a one-liner you'd just put in the chat).
 | Build an ARTIFACT when… | Build a MINI-APP when… |
 |---|---|
 | It is a self-contained page to look at, play with, read, or share — a viz, mockup, UI design, diagram, report, calculator, infographic, small game, document | It is a durable tool the partner returns to, with saved records and its own data model |
-| It needs no storage, no embedded chat, no cron — the page IS the product | It needs `window.mobius` storage, notifications, schedules, or registration |
+| It needs no storage or only small public-readable shared JSON; no embedded chat or cron — the page IS the product | It needs private records, `window.mobius` APIs, notifications, schedules, or registration |
 | A logged-out person you share it with should be able to use it | It only makes sense inside Möbius |
 
 When genuinely unsure, name both options in your clarifying turn and let the
 partner pick. An artifact is much cheaper — prefer it for one-shot interactive
 content and for standalone documents.
+
+---
+
+## Persisting data (optional)
+
+Stay stateless by default. When a shared artifact genuinely needs owner-set
+state—such as configuration, a counter, leaderboard, or dashboard data—use the
+injected `window.mobiusArtifact.storage` API. It is shared per artifact, carries
+across versions, and works automatically in previews and public shares; never
+handle a share token yourself.
+
+```js
+const store = window.mobiusArtifact.storage
+try {
+  const value = await store.get('score')       // JSON value, or null
+  await store.set('score', { total: 12 })      // current editor preview only
+  await store.remove('score')                  // current editor preview only
+  const keys = await store.list()              // string[]
+} catch (error) {
+  // Degrade gracefully: network, quota, and read-only failures are expected.
+}
+```
+
+Check `store.writable` before showing write controls. `store.mode` is `editor`
+in preview and `public-readonly` in a shared page; historical previews are also
+read-only. Public viewers can read the shared data, so never store secrets, PII,
+or private source material. Values must be JSON; keys match
+`[a-z0-9._-]{1,64}`, each value is at most 64 KB, and the server caps an
+artifact at 1 MB and 100 stored keys. `set()` and `remove()` reject when writes
+are unavailable—they never pretend to save.
 
 ---
 

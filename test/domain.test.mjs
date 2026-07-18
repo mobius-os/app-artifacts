@@ -4,11 +4,17 @@ import {
   appendVersion,
   artifactFilename,
   artifactIntent,
+  artifactStorageContext,
   createArtifactId,
   friendlyLoadError,
+  injectArtifactStorageShim,
+  isValidArtifactStorageKey,
   isValidProjectId,
+  jsonValueBytes,
   makeArtifactRecord,
   nextVersion,
+  planArtifactStorageRequest,
+  publishedArtifactToken,
   publishedShare,
   shareNeedsUpdate,
   slugifyTitle,
@@ -125,4 +131,68 @@ test('artifactIntent accepts only the declared artifact deep-link grammar', () =
   assert.equal(artifactIntent('artifact:has spaces'), null)
   assert.equal(artifactIntent(`artifact:${'a'.repeat(65)}`), null)
   assert.equal(artifactIntent('chat:tip-calculator'), null)
+})
+
+test('artifact storage context distinguishes embedded previews from published paths', () => {
+  const token = '0123456789abcdef0123456789abcdef'
+  assert.deepEqual(
+    artifactStorageContext({ variant: 'preview', embedded: true }),
+    { kind: 'preview', mode: 'editor', token: null, writable: true },
+  )
+  assert.deepEqual(
+    artifactStorageContext({ variant: 'published', pathname: `/sites/${token}/nested/page` }),
+    { kind: 'published', mode: 'public-readonly', token, writable: false },
+  )
+  assert.equal(artifactStorageContext({ variant: 'preview', embedded: false }), null)
+  assert.equal(publishedArtifactToken('/sites/not-hex/'), null)
+  assert.equal(publishedArtifactToken(`/other/${token}/`), null)
+})
+
+test('artifact storage keys and values are validated before bridge execution', () => {
+  assert.equal(isValidArtifactStorageKey('score.current'), true)
+  assert.equal(isValidArtifactStorageKey('../other'), false)
+  assert.equal(isValidArtifactStorageKey('UPPER'), false)
+  assert.equal(isValidArtifactStorageKey('__mobius_keys'), false)
+  assert.equal(jsonValueBytes({ score: 2 }), 11)
+  assert.equal(jsonValueBytes({ score: Number.NaN }), null)
+  assert.equal(jsonValueBytes(undefined), null)
+})
+
+test('artifact storage request planning pins artifact id and allowlists operations', () => {
+  const base = {
+    type: 'moebius:artifact-storage',
+    requestId: 'request-1',
+    nonce: 'nonce-1',
+  }
+  const plan = planArtifactStorageRequest(
+    { ...base, op: 'set', key: 'score', value: 7, artifactId: 'attacker-artifact' },
+    { artifactId: 'mounted-artifact', writable: true },
+  )
+  assert.equal(plan.artifactId, 'mounted-artifact')
+  assert.equal(plan.key, 'score')
+  assert.throws(
+    () => planArtifactStorageRequest({ ...base, op: 'copy', key: 'score' }, {
+      artifactId: 'mounted-artifact', writable: true,
+    }),
+    (error) => error.bridgeError === 'invalid-op',
+  )
+  assert.throws(
+    () => planArtifactStorageRequest({ ...base, op: 'get', key: '../other' }, {
+      artifactId: 'mounted-artifact', writable: true,
+    }),
+    (error) => error.bridgeError === 'invalid-key',
+  )
+  assert.throws(
+    () => planArtifactStorageRequest({ ...base, op: 'remove', key: 'score' }, {
+      artifactId: 'mounted-artifact', writable: false,
+    }),
+    (error) => error.bridgeError === 'read-only',
+  )
+})
+
+test('artifact storage injection preserves a leading doctype', () => {
+  const original = '<!-- built artifact --><!doctype html><html><body>Hi</body></html>'
+  const injected = injectArtifactStorageShim(original, { variant: 'published' })
+  assert.match(injected, /^<!-- built artifact --><!doctype html><script>/i)
+  assert.match(injected, /<html><body>Hi<\/body><\/html>$/)
 })

@@ -1,8 +1,16 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ReloadIcon } from '../ui/Icons.jsx'
-import { versionPath } from '../domain.js'
+import { injectArtifactStorageShim, versionPath } from '../domain.js'
 
-export function ArtifactFrame({ artifactId, version, storage, reloadTick = 0, fullscreen = false }) {
+export function ArtifactFrame({
+  artifactId,
+  version,
+  storage,
+  onPreviewFrame,
+  writable = true,
+  reloadTick = 0,
+  fullscreen = false,
+}) {
   const [state, setState] = useState({ status: 'loading', html: null, message: '' })
   const [localReload, setLocalReload] = useState(0)
 
@@ -24,6 +32,16 @@ export function ArtifactFrame({ artifactId, version, storage, reloadTick = 0, fu
       })
     return () => { active = false }
   }, [artifactId, version, storage, reloadTick, localReload])
+
+  const previewHtml = useMemo(() => (
+    state.html == null
+      ? null
+      : injectArtifactStorageShim(state.html, { variant: 'preview', writable })
+  ), [state.html, writable])
+
+  const registerFrame = useCallback((frame) => {
+    onPreviewFrame?.(frame, { artifactId, writable })
+  }, [artifactId, onPreviewFrame, writable])
 
   return (
     <div className={`af-preview${fullscreen ? ' is-fullscreen' : ''}`}>
@@ -48,7 +66,8 @@ export function ArtifactFrame({ artifactId, version, storage, reloadTick = 0, fu
           className="af-preview-frame"
           title={`Artifact preview, version ${version}`}
           sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-          srcDoc={state.html}
+          srcDoc={previewHtml}
+          ref={registerFrame}
         />
       )}
     </div>

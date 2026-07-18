@@ -39,3 +39,16 @@ test('manifest keeps the Artifacts system prompt wiring', async () => {
   assert.equal(manifest.system_prompt, 'artifacts-core.md')
   assert.ok(manifest.source_files.includes('artifacts-core.md'))
 })
+
+test('storage bridge identifies only the mounted opaque preview frame', async () => {
+  const source = await readSource('index.jsx')
+  assert.match(source, /event\.source !== mounted\.frame\.contentWindow/)
+  assert.doesNotMatch(source, /event\.origin\s*===/)
+  assert.match(source, /planArtifactStorageRequest\(message, mounted\)/)
+})
+
+test('published staging injects storage without changing immutable version HTML', async () => {
+  const source = await readSource('ui/Detail.jsx')
+  assert.match(source, /injectArtifactStorageShim\(html, \{ variant: 'published' \}\)/)
+  assert.match(source, /setText\(`projects\/\$\{record\.id\}\/build\/site\/index\.html`, publishedHtml\)/)
+})

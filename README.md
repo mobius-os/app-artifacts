@@ -12,7 +12,12 @@ Artifacts ships an always-on prompt fragment that nudges the agent to offer visu
 - Copies selected-version HTML as plain text and downloads it with an explicit scripts warning.
 - Resolves origin chat titles through the redacted chat-log summary permission.
 - Stages a selected version through Möbius publishing, tracks its stable public URL, updates it on demand, and unpublishes it.
+- Injects an optional per-artifact JSON storage API: owners can write from the current preview, while public shares can read the same capped data without receiving app credentials.
 - Handles `/shell/?app=artifacts&intent=artifact:<id>` intents and provides chat handoffs in both directions.
+
+Version 0.5.0 adds owner-write/public-read artifact persistence. Stored version
+files remain immutable; the app injects the appropriate preview or published
+storage shim only when rendering or staging a copy.
 
 ## Storage contract
 

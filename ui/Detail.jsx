@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { artifactFilename, shareNeedsUpdate, publishedShare, stoppedShare, versionPath } from '../domain.js'
+import {
+  artifactFilename,
+  injectArtifactStorageShim,
+  shareNeedsUpdate,
+  publishedShare,
+  stoppedShare,
+  versionPath,
+} from '../domain.js'
 import { loadChatTitles } from '../storage.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
 import { VersionTimeline } from './VersionTimeline.jsx'
@@ -41,7 +48,7 @@ function compensatedError(message, cause) {
   return error
 }
 
-export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
+export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, onDeleted }) {
   const [record, setRecord] = useState(null)
   const [share, setShare] = useState(null)
   const [shareKnown, setShareKnown] = useState(false)
@@ -221,7 +228,8 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
   async function stageVersion(version) {
     const html = await readVersionHtml(version)
     await storage.removeFolder(`projects/${record.id}/build/site`)
-    await storage.setText(`projects/${record.id}/build/site/index.html`, html)
+    const publishedHtml = injectArtifactStorageShim(html, { variant: 'published' })
+    await storage.setText(`projects/${record.id}/build/site/index.html`, publishedHtml)
   }
 
   async function publish(version) {
@@ -451,7 +459,17 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
               </div>
             </div>
             {viewMode === 'preview'
-              ? <ArtifactFrame artifactId={record.id} version={previewVersion} storage={storage} reloadTick={reloadTick} fullscreen={fullscreen} />
+              ? (
+                <ArtifactFrame
+                  artifactId={record.id}
+                  version={previewVersion}
+                  storage={storage}
+                  onPreviewFrame={onPreviewFrame}
+                  writable={previewVersion === currentVersion}
+                  reloadTick={reloadTick}
+                  fullscreen={fullscreen}
+                />
+              )
               : (
                 <div className="af-source" aria-label={`HTML source, version ${previewVersion}`}>
                   {(sourceState.key !== sourceKey || sourceState.status === 'loading') && (
