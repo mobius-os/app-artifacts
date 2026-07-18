@@ -67,32 +67,38 @@ for public sharing. Sharing is the partner's action, taken in the app.
 1. Author the page (rules below) and save it to a temp file.
 2. Mint the id: slugified title + 4 random hex, all `[a-z0-9-]`, ≤ 45 chars
    total — e.g. `"Tip Calculator"` → `tip-calculator-7f3a`.
-3. Write the version blob, then the record. **Write the record atomically**
-   (temp file + `os.replace`) so the app's live gallery never reads a
-   half-written file:
+3. Write the version blob, then the record. Pass every value through
+   **argv** (never interpolate a title/description into the Python source — a
+   `"` or `$(...)` in it would break or inject), use a **quoted** heredoc, and
+   write the record **atomically** (unique temp + `os.replace`) so the live
+   gallery never reads a half-written file. Create the blob with `noclobber`
+   so a rare id collision can never overwrite an existing artifact:
 
 ```bash
 AID="tip-calculator-$(openssl rand -hex 2)"
 D="/data/apps/$ARTIFACTS_APP_ID"
 NOW=$(date -u +%FT%TZ)
+TITLE="Tip Calculator"
+DESC="Split a bill and compute per-person tips."
 
 mkdir -p "$D/versions/$AID" "$D/artifacts"
-cp page.html "$D/versions/$AID/v1.html"          # immutable once written
+# exclusive create — noclobber makes `>` fail instead of overwriting; a
+# collision means mint a fresh id and retry rather than clobber someone's work.
+if ! (set -o noclobber; cat page.html > "$D/versions/$AID/v1.html") 2>/dev/null; then
+  echo "v1 already exists for $AID — mint a new id and retry"; exit 1
+fi
 
-python3 - "$D/artifacts/$AID.json" <<PY
+python3 - "$D/artifacts/$AID.json" "$AID" "$TITLE" "$DESC" "$CHAT_ID" "$NOW" \
+         "$D/versions/$AID/v1.html" <<'PY'
 import json, os, sys
-path = sys.argv[1]
-tmp = path + ".tmp"
-json.dump({
-  "id": "$AID", "title": "Tip Calculator",
-  "description": "Split a bill and compute per-person tips.",
-  "chat_id": "$CHAT_ID",                    # provenance — the app links back here
-  "created_at": "$NOW", "updated_at": "$NOW",
-  "current_version": 1,
-  "versions": [{"v": 1, "created_at": "$NOW", "chat_id": "$CHAT_ID",
-                "note": "first version",
-                "bytes": $(wc -c < "$D/versions/$AID/v1.html")}],
-}, open(tmp, "w"))
+path, aid, title, desc, chat, now, blob = sys.argv[1:8]
+rec = {"id": aid, "title": title, "description": desc,
+       "chat_id": chat,                      # provenance — the app links back here
+       "created_at": now, "updated_at": now, "current_version": 1,
+       "versions": [{"v": 1, "created_at": now, "chat_id": chat,
+                     "note": "first version", "bytes": os.path.getsize(blob)}]}
+tmp = f"{path}.{os.getpid()}.tmp"            # unique temp — concurrent writers don't collide
+with open(tmp, "w") as f: json.dump(rec, f)
 os.replace(tmp, path)                        # atomic swap — no torn reads
 PY
 ```
@@ -122,18 +128,21 @@ Find the id first: it is in your earlier reply's link, or list
 REC="$D/artifacts/$AID.json"
 NEXT=$(python3 -c "import json; print(json.load(open('$REC'))['current_version']+1)")
 DEST="$D/versions/$AID/v$NEXT.html"
-if [ -e "$DEST" ]; then echo "v$NEXT already exists — re-read the record and retry"; exit 1; fi
-cp page.html "$DEST"
-python3 - "$REC" "$DEST" $NEXT "dark theme + rounding" <<'PY'
+NOTE="dark theme + rounding"
+# exclusive create — if a concurrent turn already took v$NEXT, `>` fails here
+# (no torn overwrite of immutable history); re-read the record and retry.
+if ! (set -o noclobber; cat page.html > "$DEST") 2>/dev/null; then
+  echo "v$NEXT already exists — re-read the record and retry with the next number"; exit 1
+fi
+python3 - "$REC" "$DEST" "$NEXT" "$NOTE" "$CHAT_ID" <<'PY'
 import json, os, sys, datetime
-rec, blob, nxt, note = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
+rec, blob, nxt, note, chat = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5]
 d = json.load(open(rec))                     # re-read fresh, then append
 now = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 d["current_version"] = nxt; d["updated_at"] = now
-d["versions"].append({"v": nxt, "created_at": now,
-  "chat_id": os.environ.get("CHAT_ID", ""), "note": note,
-  "bytes": os.path.getsize(blob)})
-tmp = rec + ".tmp"; json.dump(d, open(tmp, "w")); os.replace(tmp, rec)
+d["versions"].append({"v": nxt, "created_at": now, "chat_id": chat,
+                      "note": note, "bytes": os.path.getsize(blob)})
+tmp = f"{rec}.{os.getpid()}.tmp"; json.dump(d, open(tmp, "w")); os.replace(tmp, rec)
 PY
 ```
 
