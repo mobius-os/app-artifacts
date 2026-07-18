@@ -67,10 +67,6 @@ export function ShareIcon(props) {
   return <Svg {...props}><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5" /><path d="m8.2 13.2 7.6 4.5" /></Svg>
 }
 
-export function SparkIcon(props) {
-  return <Svg {...props}><path d="m12 3 1.1 4.2A5.2 5.2 0 0 0 16.8 11L21 12l-4.2 1.1a5.2 5.2 0 0 0-3.7 3.7L12 21l-1.1-4.2a5.2 5.2 0 0 0-3.7-3.7L3 12l4.2-1.1a5.2 5.2 0 0 0 3.7-3.7z" /></Svg>
-}
-
 export function TrashIcon(props) {
   return <Svg {...props}><path d="M4 7h16" /><path d="m9 7 .7-3h4.6l.7 3" /><path d="m6.5 7 .8 13h9.4l.8-13" /><path d="M10 11v5" /><path d="M14 11v5" /></Svg>
 }

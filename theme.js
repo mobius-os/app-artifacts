@@ -501,7 +501,7 @@ export const CSS = `
   .af-page { padding: 1.5rem 1.5rem 3rem; }
   .af-card-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
   .af-detail-page { padding-inline: 1.5rem; }
-  .af-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; padding-block: 1rem; }
+  .af-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; padding-block: 1rem; }
   .af-action { align-items: flex-start; min-height: 7.25rem; padding: 0.875rem; border: 1px solid var(--border); border-radius: 0.75rem; }
   .af-action:last-child { border-bottom: 1px solid var(--border); }
 }

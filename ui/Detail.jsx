@@ -44,6 +44,7 @@ function compensatedError(message, cause) {
 export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
   const [record, setRecord] = useState(null)
   const [share, setShare] = useState(null)
+  const [shareKnown, setShareKnown] = useState(false)
   const [status, setStatus] = useState('loading')
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [reloadTick, setReloadTick] = useState(0)
@@ -73,6 +74,8 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
     let active = true
     let refreshing = false
     setStatus('loading')
+    setShare(null)
+    setShareKnown(false)
     setSelectedVersion(null)
     setViewMode('preview')
     setSourceState({ key: '', status: 'idle', html: '', message: '' })
@@ -91,25 +94,32 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
       })
       setStatus(value ? 'ready' : 'missing')
     }
+    const acceptShare = (value) => {
+      if (!active) return
+      setShare(value || null)
+      setShareKnown(true)
+    }
     const unsubscribeRecord = storage.subscribe(recordPath, acceptRecord)
-    const unsubscribeShare = storage.subscribe(sharePath, (value) => { if (active) setShare(value || null) })
+    const unsubscribeShare = storage.subscribe(sharePath, acceptShare)
     storage.getFresh(recordPath).then(acceptRecord).catch((error) => {
       if (active) {
         setStatus('error')
         showToast(error?.message || 'Artifact could not be loaded.', 'error')
       }
     })
-    storage.getFresh(sharePath).then((value) => { if (active) setShare(value || null) }).catch(() => {})
+    storage.getFresh(sharePath).then(acceptShare).catch(() => {})
     const refresh = async () => {
       if (refreshing || document.visibilityState === 'hidden') return
       refreshing = true
       try {
-        const [nextRecord, nextShare] = await Promise.all([
+        const [nextRecord, nextShareResult] = await Promise.all([
           storage.getFresh(recordPath),
-          storage.getFresh(sharePath).catch(() => null),
+          storage.getFresh(sharePath)
+            .then((value) => ({ loaded: true, value }))
+            .catch(() => ({ loaded: false, value: null })),
         ])
         acceptRecord(nextRecord)
-        if (active) setShare(nextShare || null)
+        if (nextShareResult.loaded) acceptShare(nextShareResult.value)
       } catch {
         // Keep the subscribed last-known record; the next visible poll retries.
       } finally {
@@ -354,7 +364,15 @@ export function Detail({ artifactId, storage, token, onClose, onDeleted }) {
     if (!record || busy) return
     setBusy('delete')
     try {
-      if (share?.published) await storage.unpublish(record.id)
+      if (!shareKnown || share?.published) {
+        try {
+          await storage.unpublish(record.id)
+        } catch {
+          showToast('Couldn\'t revoke the public link \u2014 try again', 'error')
+          setBusy('')
+          return
+        }
+      }
       await storage.removeFolder(`versions/${record.id}`)
       await storage.removeFolder(`projects/${record.id}`)
       await storage.remove(`shares/${record.id}.json`)

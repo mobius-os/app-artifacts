@@ -2,6 +2,42 @@ const ID_BASE_MAX = 40
 const ID_SUFFIX_RE = /^[0-9a-f]{4}$/
 const PROJECT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 
+function failureStatus(error) {
+  const directStatus = Number(error?.status ?? error?.response?.status)
+  if (
+    directStatus === 0
+    || (Number.isInteger(directStatus) && directStatus >= 100 && directStatus <= 599)
+  ) {
+    return directStatus
+  }
+  const statusMatch = String(error?.message || '').match(/\b([1-5]\d{2})\b/)
+  return statusMatch ? Number(statusMatch[1]) : null
+}
+
+export function friendlyLoadError(error) {
+  const status = failureStatus(error)
+  const message = String(error?.message || '')
+  if (
+    status === 0
+    || /failed to fetch|network\s*error|network request failed|offline|connection/i.test(message)
+  ) {
+    return 'We couldn\u2019t reach your artifacts. Check your connection and try again.'
+  }
+  if (status === 401 || status === 403) {
+    return 'You don\u2019t have permission to view these artifacts. Sign in again or contact your administrator.'
+  }
+  if (status === 404) {
+    return 'Artifact storage isn\u2019t available. Refresh the app and try again.'
+  }
+  if (status === 413) {
+    return 'This artifact catalog is too large to load. Remove unused artifacts and try again.'
+  }
+  if (status !== null && status >= 500) {
+    return 'Artifacts are temporarily unavailable. Try again in a moment.'
+  }
+  return 'Artifacts couldn\u2019t be loaded. Try again.'
+}
+
 export function slugifyTitle(value) {
   const normalized = String(value ?? '')
     .normalize('NFKD')

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { friendlyLoadError } from '../domain.js'
 import { ArtifactCard } from './ArtifactCard.jsx'
 import { Empty, LoadError } from './Empty.jsx'
 import { ArtifactIcon } from './Icons.jsx'
@@ -6,11 +7,20 @@ import { ArtifactIcon } from './Icons.jsx'
 const POLL_MS = 3500
 
 async function readFolder(storage, prefix) {
-  const entries = await storage.list(prefix)
-  const paths = entries
-    .map((entry) => entry?.path || (entry?.name ? `${prefix}${entry.name}` : null))
-    .filter((path) => typeof path === 'string' && path.endsWith('.json'))
-  const values = await Promise.all(paths.map((path) => storage.getFresh(path).catch(() => null)))
+  const entries = await storage.list(prefix, { includeContent: true })
+  const values = await Promise.all(entries.map(async (entry) => {
+    const path = entry?.path || (entry?.name ? `${prefix}${entry.name}` : null)
+    if (typeof path !== 'string' || !path.endsWith('.json')) return null
+    if (entry?.content !== undefined) {
+      if (typeof entry.content !== 'string') return entry.content
+      try {
+        return JSON.parse(entry.content)
+      } catch {
+        return null
+      }
+    }
+    return storage.getFresh(path).catch(() => null)
+  }))
   return values.filter((value) => value && typeof value === 'object')
 }
 
@@ -43,7 +53,8 @@ export function Gallery({ storage, onOpen }) {
       setError('')
     } catch (cause) {
       if (id !== loadId.current) return
-      setError(cause?.message || 'Check your connection and try again.')
+      console.error('Could not load the artifact gallery.', cause)
+      setError(friendlyLoadError(cause))
       setStatus((current) => current === 'ready' ? 'ready' : 'error')
     } finally {
       loading.current = false

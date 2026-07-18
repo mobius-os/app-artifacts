@@ -5,6 +5,7 @@ import {
   artifactFilename,
   artifactIntent,
   createArtifactId,
+  friendlyLoadError,
   isValidProjectId,
   makeArtifactRecord,
   nextVersion,
@@ -14,6 +15,37 @@ import {
   stoppedShare,
   versionPath,
 } from '../domain.js'
+
+test('friendlyLoadError maps technical failures to actionable gallery copy', () => {
+  assert.equal(
+    friendlyLoadError({ status: 0 }),
+    'We couldn\u2019t reach your artifacts. Check your connection and try again.',
+  )
+  assert.equal(
+    friendlyLoadError(new Error('Could not list artifacts/ (403).')),
+    'You don\u2019t have permission to view these artifacts. Sign in again or contact your administrator.',
+  )
+  assert.equal(
+    friendlyLoadError({ status: 401 }),
+    'You don\u2019t have permission to view these artifacts. Sign in again or contact your administrator.',
+  )
+  assert.equal(
+    friendlyLoadError({ status: 404 }),
+    'Artifact storage isn\u2019t available. Refresh the app and try again.',
+  )
+  assert.equal(
+    friendlyLoadError({ response: { status: 413 } }),
+    'This artifact catalog is too large to load. Remove unused artifacts and try again.',
+  )
+  assert.equal(
+    friendlyLoadError(new Error('Could not list artifacts/ (503).')),
+    'Artifacts are temporarily unavailable. Try again in a moment.',
+  )
+  assert.equal(
+    friendlyLoadError(new Error('Unexpected response shape')),
+    'Artifacts couldn\u2019t be loaded. Try again.',
+  )
+})
 
 test('slugifyTitle produces a stable lowercase storage segment', () => {
   assert.equal(slugifyTitle('  Café Revenue — Q3!  '), 'cafe-revenue-q3')
