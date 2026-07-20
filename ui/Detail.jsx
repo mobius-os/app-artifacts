@@ -6,6 +6,8 @@ import {
   publishedShare,
   stoppedShare,
   versionPath,
+  isValidShareToken,
+  recoveredShare,
 } from '../domain.js'
 import { loadChatTitles } from '../storage.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
@@ -101,10 +103,42 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       })
       setStatus(value ? 'ready' : 'missing')
     }
+    // The platform writes a publish token hint into the app's OWN storage, so
+    // an absent shares/<id>.json does not prove nothing is public: a failed
+    // record write, or a lost record, would otherwise strand a live page with
+    // no in-app way to revoke it. Read the hint once per artifact and recover
+    // the token from it.
+    let hintChecked = false
+    const recoverFromHint = async () => {
+      if (hintChecked) return null
+      hintChecked = true
+      try {
+        const raw = await storage.getText(
+          `projects/${artifactId}/build/publish-token.txt`,
+        )
+        const token = String(raw || '').trim()
+        if (!isValidShareToken(token)) return null
+        return recoveredShare({ id: artifactId, token })
+      } catch {
+        return null
+      }
+    }
     const acceptShare = (value) => {
       if (!active) return
-      setShare(value || null)
+      if (value) {
+        setShare(value)
+        setShareKnown(true)
+        return
+      }
+      // Keep a recovered share visible: the poll re-reads the still-missing
+      // record every few seconds, and clearing would make Stop sharing flicker
+      // away from a page that is genuinely still live.
+      setShare((current) => (current?.recovered ? current : null))
       setShareKnown(true)
+      recoverFromHint().then((recovered) => {
+        if (!active || !recovered) return
+        setShare((current) => (current?.published ? current : recovered))
+      })
     }
     const unsubscribeRecord = storage.subscribe(recordPath, acceptRecord)
     const unsubscribeShare = storage.subscribe(sharePath, acceptShare)

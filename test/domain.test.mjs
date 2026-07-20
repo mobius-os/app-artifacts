@@ -22,6 +22,8 @@ import {
   slugifyTitle,
   stoppedShare,
   versionPath,
+  isValidShareToken,
+  recoveredShare,
 } from '../domain.js'
 
 test('friendlyLoadError maps technical failures to actionable gallery copy', () => {
@@ -243,4 +245,28 @@ test('the preview shim sends the parent-issued session key on every request', ()
     variant: 'published', sessionKey: 'mint-abc',
   })
   assert.match(published, /"sessionKey":""/)
+})
+
+test('a share recovered from the token hint claims nothing about its version', () => {
+  // Publish writes a token hint into the app's own storage, so an absent
+  // shares/<id>.json does not prove nothing is public — recovering from the
+  // hint is what keeps Stop sharing reachable for a still-live page.
+  const share = recoveredShare({ id: 'deck-01', token: 'a'.repeat(32) })
+  assert.equal(share.published, true)
+  assert.equal(share.url, `/sites/${'a'.repeat(32)}/`)
+  assert.equal(share.recovered, true)
+  // The version only ever lived in the lost record: never guessed.
+  assert.equal(share.shared_version, null)
+  // It still reads as needing an update, so re-publishing repairs the record.
+  assert.equal(shareNeedsUpdate({ current_version: 3 }, share), true)
+})
+
+test('a share token is only accepted in the platform hex form', () => {
+  assert.equal(isValidShareToken('a'.repeat(32)), true)
+  assert.equal(isValidShareToken(`  ${'b'.repeat(16)}  `), true)
+  for (const bad of ['', 'zz', 'a'.repeat(15), 'a'.repeat(65), '../etc', 'A'.repeat(32), null]) {
+    assert.equal(isValidShareToken(bad), false, `rejected: ${bad}`)
+  }
+  assert.throws(() => recoveredShare({ id: 'deck-01', token: 'nope' }))
+  assert.throws(() => recoveredShare({ id: '../evil', token: 'a'.repeat(32) }))
 })

@@ -52,3 +52,39 @@ test('published staging injects storage without changing immutable version HTML'
   assert.match(source, /injectArtifactStorageShim\(html, \{ variant: 'published' \}\)/)
   assert.match(source, /setText\(`projects\/\$\{record\.id\}\/build\/site\/index\.html`, publishedHtml\)/)
 })
+
+test('the in-flight storage cap is never reset on frame remount', async () => {
+  // Entries drain when each request settles, so clearing the set on remount
+  // would reset the cap while the old document's fetches are still queued —
+  // letting a reload admit another full batch of up-to-64KB values on top.
+  const source = await readSource('index.jsx')
+  assert.doesNotMatch(
+    source,
+    /storageRequestsRef\.current\.clear\(\)/,
+    'the pending-request set must drain naturally, never be cleared',
+  )
+  assert.match(source, /storageRequestsRef\.current\.delete\(pendingKey\)/)
+})
+
+test('gallery records are id-validated before they reach storage paths', async () => {
+  // A record id read from artifacts/ is interpolated into storage paths and
+  // request URLs; only deep-linked ids used to be validated.
+  const source = await readSource('ui/Gallery.jsx')
+  assert.match(source, /isValidProjectId/, 'Gallery must validate record ids')
+  assert.match(
+    source,
+    /filter\(\(value\) => isValidProjectId\(value\?\.id\)\)/,
+    'records must be filtered by a valid artifact id before use',
+  )
+})
+
+test('a recovered share is presented without inventing a version', async () => {
+  const source = await readSource('ui/ShareSheet.jsx')
+  assert.match(source, /share\.recovered/, 'the sheet must branch on a recovered share')
+  // The lost record held the only copy of the shared version.
+  assert.doesNotMatch(
+    source,
+    /version \$\{share\.shared_version\}[^}]*recovered/,
+    'a recovered share must not claim a version',
+  )
+})

@@ -71,7 +71,14 @@ export function ShareSheet({
           <span className="af-sheet-icon" aria-hidden="true"><ShareIcon size={21} /></span>
           <div>
             <h2 id="af-share-title">{shared ? 'Shared artifact' : 'Share this artifact'}</h2>
-            <p>{shared ? `Public snapshot: version ${share.shared_version}` : `Publish version ${current} as a public snapshot.`}</p>
+            <p>{shared
+              ? (share.recovered
+                // Recovered from the platform's token hint after the share
+                // record was lost — the version only ever lived in that record,
+                // so claim nothing about it.
+                ? 'This artifact has a public link, but its saved share details were lost. Stop sharing to take it down.'
+                : `Public snapshot: version ${share.shared_version}`)
+              : `Publish version ${current} as a public snapshot.`}</p>
           </div>
         </div>
 

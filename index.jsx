@@ -82,14 +82,18 @@ export default function ArtifactsApp({ appId, token }) {
   const storageMutationRef = useRef(Promise.resolve())
 
   const onPreviewFrame = useCallback((frame, context) => {
+    // Deliberately do NOT clear storageRequestsRef here. Its entries are
+    // removed when each request settles, so clearing on remount would reset the
+    // in-flight cap while the old document's fetches (values up to 64 KB each)
+    // are still queued — letting a reload admit another full batch on top.
+    // Stale entries can't collide either: the key includes the child's random
+    // per-document nonce, so a fresh document never reuses one.
     if (frame) {
       previewFrameRef.current = { frame, ...context }
-      storageRequestsRef.current.clear()
       return
     }
     if (previewFrameRef.current?.artifactId === context.artifactId) {
       previewFrameRef.current = null
-      storageRequestsRef.current.clear()
     }
   }, [])
 

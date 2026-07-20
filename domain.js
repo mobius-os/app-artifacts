@@ -308,6 +308,39 @@ export function publishedShare({ id, version, token, url, publishedAt } = {}) {
   }
 }
 
+// The platform mints a hex publish token; the hint file in the app's own
+// storage is the only copy the app can read back after a lost share record.
+const SHARE_TOKEN_RE = /^[a-f0-9]{16,64}$/
+
+export function isValidShareToken(token) {
+  return SHARE_TOKEN_RE.test(String(token ?? '').trim())
+}
+
+/**
+ * A share reconstructed from the platform's token hint after the app's own
+ * `shares/<id>.json` record is missing.
+ *
+ * Publish writes that hint into the app's storage, so an absent record does NOT
+ * prove nothing is public — a failed record write (or a lost record) would
+ * otherwise leave a live page with no in-app way to revoke it. The shared
+ * VERSION only ever lived in the lost record, so it is deliberately null here
+ * rather than guessed: callers must present it as unknown.
+ */
+export function recoveredShare({ id, token } = {}) {
+  if (!isValidProjectId(id)) throw new Error('A valid artifact id is required.')
+  const clean = String(token ?? '').trim()
+  if (!isValidShareToken(clean)) throw new Error('A valid share token is required.')
+  return {
+    published: true,
+    project_id: id,
+    token: clean,
+    url: `/sites/${clean}/`,
+    shared_version: null,
+    published_at: null,
+    recovered: true,
+  }
+}
+
 export function stoppedShare(share, stoppedAt) {
   return {
     ...(share || {}),

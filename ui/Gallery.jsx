@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { friendlyLoadError } from '../domain.js'
+import { friendlyLoadError, isValidProjectId } from '../domain.js'
 import { ArtifactCard } from './ArtifactCard.jsx'
 import { Empty, LoadError } from './Empty.jsx'
 import { ArtifactIcon } from './Icons.jsx'
@@ -37,11 +37,16 @@ export function Gallery({ storage, onOpen }) {
     loading.current = true
     const id = ++loadId.current
     try {
-      const [records, shareRecords] = await Promise.all([
+      const [allRecords, shareRecords] = await Promise.all([
         readFolder(storage, 'artifacts/'),
         readFolder(storage, 'shares/'),
       ])
       if (id !== loadId.current) return
+      // A record's own `id` is interpolated into storage paths and request URLs
+      // downstream, and only deep-linked ids were validated before. Drop any
+      // record whose id isn't a plain artifact id so a malformed one (e.g.
+      // containing `../` or `?`) can never reshape a later authenticated read.
+      const records = allRecords.filter((value) => isValidProjectId(value?.id))
       records.sort((a, b) => {
         const right = new Date(b.updated_at || b.created_at || 0).getTime()
         const left = new Date(a.updated_at || a.created_at || 0).getTime()
