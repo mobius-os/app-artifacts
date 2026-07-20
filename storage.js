@@ -148,6 +148,20 @@ export function makeStorage(appId, token) {
     return response.json()
   }
 
+  async function artifactDataKeys(artifactId) {
+    // Server-derived from the directory: no client index to keep in sync.
+    const response = await fetch(
+      `/api/apps/${appId}/artifact-data/${encodeURIComponent(artifactId)}`,
+      { headers: auth },
+    )
+    if (response.status === 404) return []
+    if (!response.ok) {
+      throw await responseError(response, `Could not list artifact data (${response.status}).`)
+    }
+    const body = await response.json()
+    return Array.isArray(body?.keys) ? body.keys : []
+  }
+
   async function artifactDataSet(artifactId, key, value) {
     const response = await fetch(artifactDataUrl(artifactId, key), {
       method: 'PUT',
@@ -182,6 +196,7 @@ export function makeStorage(appId, token) {
     publish,
     unpublish,
     artifactDataGet,
+    artifactDataKeys,
     artifactDataSet,
     artifactDataRemove,
   }

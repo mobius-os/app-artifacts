@@ -146,11 +146,17 @@ test('published shim derives its token from the path and is stably read-only', a
       pathname: `/sites/${token}/index.html`,
       fetch: async (url, options) => {
         requests.push({ url, options })
-        if (url.endsWith('/__mobius_keys')) {
+        // The collection endpoint is server-derived from the directory; there
+        // is no client index to read. It can still surface a retired
+        // __mobius_keys file left by an older app version, plus (defensively) a
+        // malformed name — both must be filtered out of list().
+        if (url === `/api/published-sites/${token}/data`) {
           return {
             ok: true,
             status: 200,
-            json: async () => ['zeta', '../escape', 'alpha', 'alpha'],
+            json: async () => ({
+              keys: ['zeta', '__mobius_keys', '../escape', 'alpha', 'alpha'],
+            }),
           }
         }
         return { ok: true, status: 200, json: async () => ({ count: 3 }) }

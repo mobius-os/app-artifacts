@@ -3,7 +3,6 @@ import {
   ARTIFACT_STORAGE_INDEX_KEY,
   ARTIFACT_STORAGE_MAX_PENDING,
   artifactIntent,
-  isValidArtifactStorageKey,
   planArtifactStorageRequest,
   isTrustedArtifactStorageMessage,
 } from './domain.js'
@@ -12,64 +11,36 @@ import { CSS } from './theme.js'
 import { Gallery } from './ui/Gallery.jsx'
 import { Detail } from './ui/Detail.jsx'
 
-// The durable list index consumes one of the server's 100 capped key slots.
-const MAX_USER_STORAGE_KEYS = 99
 
-function storageKeys(value) {
-  if (!Array.isArray(value)) return []
-  return [...new Set(value.filter(isValidArtifactStorageKey))].sort()
+async function listArtifactKeys(storage, artifactId) {
+  const keys = await storage.artifactDataKeys(artifactId)
+  // An artifact written by an older version may still hold the retired
+  // __mobius_keys index file. The server counts it as a stored value, so it
+  // would silently occupy one of the 100 key slots and its bytes forever.
+  // Hide it from authors AND retire it opportunistically — best-effort, since
+  // failing to clean up must never fail the list.
+  if (keys.includes(ARTIFACT_STORAGE_INDEX_KEY)) {
+    try {
+      await storage.artifactDataRemove(artifactId, ARTIFACT_STORAGE_INDEX_KEY)
+    } catch { /* a stale index is harmless; the filter below still hides it */ }
+  }
+  return keys.filter((key) => key !== ARTIFACT_STORAGE_INDEX_KEY).sort()
 }
 
-async function readStorageKeys(storage, artifactId) {
-  return storageKeys(await storage.artifactDataGet(artifactId, ARTIFACT_STORAGE_INDEX_KEY))
-}
 
 async function executeArtifactStoragePlan(storage, plan) {
+  // Every op is a single server call. There is deliberately NO client-maintained
+  // key index: two tabs each read the old index, wrote their own key, and the
+  // second index write dropped the first — leaving a value that existed but
+  // could not be listed. The server derives the list from the directory, which
+  // cannot disagree with itself, and enforces the key cap authoritatively.
   if (plan.op === 'get') return storage.artifactDataGet(plan.artifactId, plan.key)
-  if (plan.op === 'list') return readStorageKeys(storage, plan.artifactId)
+  if (plan.op === 'list') return listArtifactKeys(storage, plan.artifactId)
   if (plan.op === 'set') {
-    const keys = await readStorageKeys(storage, plan.artifactId)
-    if (keys.includes(plan.key)) {
-      await storage.artifactDataSet(plan.artifactId, plan.key, plan.value)
-      return undefined
-    }
-    if (keys.length >= MAX_USER_STORAGE_KEYS) {
-      const error = new Error('key-limit')
-      error.bridgeError = 'key-limit'
-      throw error
-    }
     await storage.artifactDataSet(plan.artifactId, plan.key, plan.value)
-    try {
-      await storage.artifactDataSet(
-        plan.artifactId,
-        ARTIFACT_STORAGE_INDEX_KEY,
-        [...keys, plan.key].sort(),
-      )
-    } catch (error) {
-      try { await storage.artifactDataRemove(plan.artifactId, plan.key) } catch {}
-      throw error
-    }
     return undefined
   }
-
-  const keys = await readStorageKeys(storage, plan.artifactId)
-  if (!keys.includes(plan.key)) {
-    await storage.artifactDataRemove(plan.artifactId, plan.key)
-    return undefined
-  }
-  const previousValue = await storage.artifactDataGet(plan.artifactId, plan.key)
   await storage.artifactDataRemove(plan.artifactId, plan.key)
-  try {
-    const nextKeys = keys.filter((key) => key !== plan.key)
-    if (nextKeys.length) {
-      await storage.artifactDataSet(plan.artifactId, ARTIFACT_STORAGE_INDEX_KEY, nextKeys)
-    } else {
-      await storage.artifactDataRemove(plan.artifactId, ARTIFACT_STORAGE_INDEX_KEY)
-    }
-  } catch (error) {
-    try { await storage.artifactDataSet(plan.artifactId, plan.key, previousValue) } catch {}
-    throw error
-  }
   return undefined
 }
 

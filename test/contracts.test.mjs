@@ -88,3 +88,29 @@ test('a recovered share is presented without inventing a version', async () => {
     'a recovered share must not claim a version',
   )
 })
+
+test('the app maintains no client-side key index', async () => {
+  // Two tabs each read the old index, wrote their own key, and the second index
+  // write dropped the first — a value that existed but could not be listed.
+  // Enumeration is server-derived now, so nothing may write the index key.
+  const source = await readSource('index.jsx')
+  assert.doesNotMatch(
+    source,
+    /artifactDataSet\(\s*\n?\s*plan\.artifactId,\s*\n?\s*ARTIFACT_STORAGE_INDEX_KEY/,
+    'set() must not write a key index',
+  )
+  assert.doesNotMatch(
+    source,
+    /artifactDataRemove\(plan\.artifactId,\s*ARTIFACT_STORAGE_INDEX_KEY\)/,
+    'remove() must not rewrite a key index',
+  )
+  // list() goes to the server-derived collection.
+  assert.match(source, /storage\.artifactDataKeys\(artifactId\)/)
+
+  const storage = await readSource('storage.js')
+  assert.match(
+    storage,
+    /\/api\/apps\/\$\{appId\}\/artifact-data\/\$\{encodeURIComponent\(artifactId\)\}/,
+    'the collection read must target the artifact-data collection route',
+  )
+})

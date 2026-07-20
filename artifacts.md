@@ -56,7 +56,8 @@ in preview and `public-readonly` in a shared page; historical previews are also
 read-only. Public viewers can read the shared data, so never store secrets, PII,
 or private source material. Values must be JSON; keys match
 `[a-z0-9._-]{1,64}`, each value is at most 64 KB, and the server caps an
-artifact at 1 MB and 100 stored keys. `set()` and `remove()` reject when writes
+artifact at 1 MB and 100 stored keys. `list()` is answered by the server from
+what is actually stored, so it never drifts from `set()`/`remove()`. `set()` and `remove()` reject when writes
 are unavailable—they never pretend to save.
 
 ---
