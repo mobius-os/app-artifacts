@@ -149,26 +149,6 @@ export function planArtifactStorageRequest(message, context) {
   }
 }
 
-export function publishedArtifactToken(pathname) {
-  const match = /^\/sites\/([a-f0-9]{16,64})(?:\/|$)/.exec(String(pathname || ''))
-  return match ? match[1] : null
-}
-
-export function artifactStorageContext({ variant, embedded = false, pathname = '' } = {}) {
-  if (variant === 'preview' && embedded) {
-    return { kind: 'preview', mode: 'editor', token: null, writable: true }
-  }
-  if (variant === 'published') {
-    return {
-      kind: 'published',
-      mode: 'public-readonly',
-      token: publishedArtifactToken(pathname),
-      writable: false,
-    }
-  }
-  return null
-}
-
 /**
  * Whether a bridge message really came from the document we staged.
  *

@@ -114,3 +114,41 @@ test('the app maintains no client-side key index', async () => {
     'the collection read must target the artifact-data collection route',
   )
 })
+
+test('the share flow reflects live state before persisting the record', async () => {
+  // The published snapshot / dead link is the source of truth; the shares/
+  // record is best-effort because the platform token hint recovers it. So the
+  // UI must be updated BEFORE the record write, and a failed write must not
+  // throw a compensation dance (which also mis-staged a recovered null version).
+  const source = await readSource('ui/Detail.jsx')
+  assert.doesNotMatch(source, /compensatedError/, 'the compensation machinery must be gone')
+
+  for (const fn of ['publish', 'stopSharing']) {
+    const body = source.slice(source.indexOf(`async function ${fn}(`))
+    const setShare = body.indexOf('setShare(next)')
+    const persist = body.indexOf('setJSON(`shares/')
+    assert.ok(setShare !== -1 && persist !== -1, `${fn} must set share + persist`)
+    assert.ok(setShare < persist, `${fn} must reflect state before persisting`)
+    // persistence is best-effort: the setJSON sits in its own try/catch.
+    assert.match(
+      body.slice(persist - 40, persist + 120),
+      /try \{[\s\S]*setJSON\(`shares\/[\s\S]*?\} catch/,
+      `${fn} must persist the record best-effort`,
+    )
+  }
+})
+
+test('hint recovery does not latch on a transient read failure', async () => {
+  // hintChecked must be set only AFTER a successful read, so a transient
+  // failure retries on the next poll instead of permanently giving up on a
+  // still-live share.
+  const source = await readSource('ui/Detail.jsx')
+  const fn = source.slice(
+    source.indexOf('const recoverFromHint'),
+    source.indexOf('const acceptShare'),
+  )
+  const read = fn.indexOf('getText(')
+  const latch = fn.indexOf('hintChecked = true')
+  assert.ok(read !== -1 && latch !== -1)
+  assert.ok(latch > read, 'must not latch before the hint read succeeds')
+})

@@ -4,7 +4,6 @@ import {
   appendVersion,
   artifactFilename,
   artifactIntent,
-  artifactStorageContext,
   createArtifactId,
   friendlyLoadError,
   injectArtifactStorageShim,
@@ -16,7 +15,6 @@ import {
   planArtifactStorageRequest,
   isTrustedArtifactStorageMessage,
   artifactStorageShimSource,
-  publishedArtifactToken,
   publishedShare,
   shareNeedsUpdate,
   slugifyTitle,
@@ -135,21 +133,6 @@ test('artifactIntent accepts only the declared artifact deep-link grammar', () =
   assert.equal(artifactIntent('artifact:has spaces'), null)
   assert.equal(artifactIntent(`artifact:${'a'.repeat(65)}`), null)
   assert.equal(artifactIntent('chat:tip-calculator'), null)
-})
-
-test('artifact storage context distinguishes embedded previews from published paths', () => {
-  const token = '0123456789abcdef0123456789abcdef'
-  assert.deepEqual(
-    artifactStorageContext({ variant: 'preview', embedded: true }),
-    { kind: 'preview', mode: 'editor', token: null, writable: true },
-  )
-  assert.deepEqual(
-    artifactStorageContext({ variant: 'published', pathname: `/sites/${token}/nested/page` }),
-    { kind: 'published', mode: 'public-readonly', token, writable: false },
-  )
-  assert.equal(artifactStorageContext({ variant: 'preview', embedded: false }), null)
-  assert.equal(publishedArtifactToken('/sites/not-hex/'), null)
-  assert.equal(publishedArtifactToken(`/other/${token}/`), null)
 })
 
 test('artifact storage keys and values are validated before bridge execution', () => {

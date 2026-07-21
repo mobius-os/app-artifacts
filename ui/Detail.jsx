@@ -43,13 +43,6 @@ function shareFailureMessage(error, fallback) {
   return error?.message || fallback
 }
 
-function compensatedError(message, cause) {
-  const error = new Error(message)
-  error.status = cause?.status
-  error.userMessage = message
-  return error
-}
-
 export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, onDeleted }) {
   const [record, setRecord] = useState(null)
   const [share, setShare] = useState(null)
@@ -111,17 +104,20 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     let hintChecked = false
     const recoverFromHint = async () => {
       if (hintChecked) return null
-      hintChecked = true
+      let raw
       try {
-        const raw = await storage.getText(
+        raw = await storage.getText(
           `projects/${artifactId}/build/publish-token.txt`,
         )
-        const token = String(raw || '').trim()
-        if (!isValidShareToken(token)) return null
-        return recoveredShare({ id: artifactId, token })
       } catch {
+        // Transient read failure: do NOT latch, so the next poll retries rather
+        // than permanently giving up on recovering a still-live share.
         return null
       }
+      hintChecked = true
+      const token = String(raw || '').trim()
+      if (!isValidShareToken(token)) return null
+      return recoveredShare({ id: artifactId, token })
     }
     const acceptShare = (value) => {
       if (!active) return
@@ -269,59 +265,25 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
   async function publish(version) {
     if (!record || busy) return
     setBusy('publish')
-    const previousShare = share?.published ? share : null
+    const updating = Boolean(share?.published)
     try {
       await stageVersion(version)
       const result = await storage.publish(record.id)
+      // The snapshot is live now; that is the source of truth. Reflect it in
+      // the UI immediately, then persist the share record BEST-EFFORT. If that
+      // write fails, the platform already wrote a token hint into the project
+      // that recoverFromHint reads back on the next load — so there is nothing
+      // to compensate, and the old rollback dance (which also mis-staged a
+      // recovered share's null version) is gone.
       const next = publishedShare({
-        id: record.id,
-        version,
-        token: result.token,
-        url: result.url,
+        id: record.id, version, token: result.token, url: result.url,
       })
+      setShare(next)
+      setShareKnown(true)
+      showToast(updating ? `Shared version updated to v${version}.` : 'Public link created.', 'success')
       try {
         await storage.setJSON(`shares/${record.id}.json`, next)
-      } catch (persistenceError) {
-        const tooLarge = isPayloadTooLarge(persistenceError)
-        if (previousShare) {
-          try {
-            await stageVersion(previousShare.shared_version)
-            await storage.publish(record.id)
-          } catch {
-            throw compensatedError(
-              tooLarge
-                ? `${TOO_LARGE_MESSAGE} The previous public snapshot could not be restored.`
-                : 'The shared version could not be saved, and the previous public snapshot could not be restored.',
-              persistenceError,
-            )
-          }
-          throw compensatedError(
-            tooLarge
-              ? `${TOO_LARGE_MESSAGE} The previous shared version is still live.`
-              : 'The shared version could not be saved. The previous shared version is still live.',
-            persistenceError,
-          )
-        }
-        try {
-          await storage.unpublish(record.id)
-        } catch {
-          setShare(next)
-          throw compensatedError(
-            tooLarge
-              ? `${TOO_LARGE_MESSAGE} The new public link could not be removed; try Stop sharing.`
-              : 'Share state could not be saved, and the new public link could not be removed. Try Stop sharing.',
-            persistenceError,
-          )
-        }
-        throw compensatedError(
-          tooLarge
-            ? `${TOO_LARGE_MESSAGE} The new public link was removed.`
-            : 'Share state could not be saved, so the new public link was removed.',
-          persistenceError,
-        )
-      }
-      setShare(next)
-      showToast(previousShare ? `Shared version updated to v${version}.` : 'Public link created.', 'success')
+      } catch { /* live + recoverable from the token hint; nothing to undo */ }
     } catch (error) {
       showToast(shareFailureMessage(error, 'Artifact could not be shared.'), 'error')
     } finally {
@@ -334,10 +296,16 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     setBusy('stop')
     try {
       await storage.unpublish(record.id)
+      // The URL is dead now — reflect it before the metadata write so a failed
+      // record save cannot leave the UI stuck showing a live share for a link
+      // that is already gone.
       const next = stoppedShare(share)
-      await storage.setJSON(`shares/${record.id}.json`, next)
       setShare(next)
+      setShareKnown(true)
       showToast('Public link removed.', 'success')
+      try {
+        await storage.setJSON(`shares/${record.id}.json`, next)
+      } catch { /* the link is down; a stale record self-heals on next load */ }
     } catch (error) {
       showToast(shareFailureMessage(error, 'Sharing could not be stopped.'), 'error')
     } finally {
