@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   artifactFilename,
   injectArtifactStorageShim,
@@ -11,15 +11,14 @@ import {
 } from '../domain.js'
 import { loadChatTitles } from '../storage.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
-import { VersionTimeline } from './VersionTimeline.jsx'
+import { VersionSheet } from './VersionTimeline.jsx'
 import { ArtifactOptionsSheet, DeleteSheet, ShareSheet } from './ShareSheet.jsx'
 import {
   ArrowLeftIcon,
-  ChatIcon,
-  ExpandIcon,
+  CodeIcon,
+  EyeIcon,
   MoreIcon,
   ReloadIcon,
-  ShareIcon,
 } from './Icons.jsx'
 
 function postToShell(message) {
@@ -49,18 +48,16 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
   const [shareKnown, setShareKnown] = useState(false)
   const [status, setStatus] = useState('loading')
   const [selectedVersion, setSelectedVersion] = useState(null)
-  const [reloadTick, setReloadTick] = useState(0)
   const [sourceReloadTick, setSourceReloadTick] = useState(0)
-  const [fullscreen, setFullscreen] = useState(false)
   const [viewMode, setViewMode] = useState('preview')
   const [sourceState, setSourceState] = useState({ key: '', status: 'idle', html: '', message: '' })
   const [shareOpen, setShareOpen] = useState(false)
   const [optionsOpen, setOptionsOpen] = useState(false)
+  const [versionsOpen, setVersionsOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState(null)
   const [chatInfo, setChatInfo] = useState({ permission: 'loading', title: null })
-  const fullscreenNav = useRef(null)
 
   const showToast = useCallback((message, tone = '') => {
     setToast({ message, tone, key: Date.now() })
@@ -191,10 +188,6 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     return () => { active = false }
   }, [record?.chat_id, token])
 
-  useEffect(() => () => {
-    try { fullscreenNav.current?.close?.() } catch {}
-  }, [])
-
   const currentVersion = Number(record?.current_version) || 1
   const previewVersion = selectedVersion || currentVersion
   const sourceKey = record ? `${record.id}:${previewVersion}` : ''
@@ -221,33 +214,6 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       })
     return () => { active = false }
   }, [previewVersion, record?.id, sourceKey, sourceReloadTick, storage, viewMode])
-
-  const toggleFullscreen = useCallback(async () => {
-    if (fullscreen) {
-      fullscreenNav.current?.close?.()
-      fullscreenNav.current = null
-      setFullscreen(false)
-      return
-    }
-    const nav = window.mobius?.nav
-    if (!nav?.open) {
-      setFullscreen(true)
-      return
-    }
-    const handle = nav.open('artifact-preview', () => {
-      fullscreenNav.current = null
-      setFullscreen(false)
-    })
-    fullscreenNav.current = handle
-    const outcome = await handle.outcome
-    if (fullscreenNav.current !== handle) return
-    if (outcome.status === 'owned' || outcome.status === 'standalone') {
-      setFullscreen(true)
-    } else {
-      fullscreenNav.current = null
-      showToast('Fullscreen is unavailable right now.')
-    }
-  }, [fullscreen, showToast])
 
   async function readVersionHtml(version) {
     const html = await storage.getText(versionPath(record.id, version))
@@ -403,6 +369,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       showToast('The origin chat was deleted.')
       return
     }
+    setOptionsOpen(false)
     postToShell({ type: 'moebius:open-chat', chatId: record.chat_id })
   }
 
@@ -433,97 +400,75 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     <div className="af-view af-detail">
       <header className="af-detail-header">
         <button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={onClose} aria-label="Back to artifacts"><ArrowLeftIcon /></button>
-        <div className="af-detail-heading"><h1>{record.title || 'Untitled artifact'}</h1><span>v{currentVersion}</span></div>
-        <button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={() => setOptionsOpen(true)} aria-label="Artifact options"><MoreIcon /></button>
+        <button className="af-detail-heading" type="button" onClick={() => setVersionsOpen(true)} aria-label={`Choose artifact version, currently ${previewVersion}`}>
+          <h1>{record.title || 'Untitled artifact'}</h1>
+          <span>{previewVersion === currentVersion ? `v${currentVersion}` : `Viewing v${previewVersion}`}</span>
+        </button>
+        <div className="af-view-toggle" role="group" aria-label="Artifact view">
+          <button className={viewMode === 'preview' ? 'is-active' : ''} type="button" aria-pressed={viewMode === 'preview'} aria-label="Preview" title="Preview" onClick={() => setViewMode('preview')}><EyeIcon size={20} /></button>
+          <button className={viewMode === 'source' ? 'is-active' : ''} type="button" aria-pressed={viewMode === 'source'} aria-label="Source" title="Source" onClick={() => setViewMode('source')}><CodeIcon size={20} /></button>
+        </div>
+        <button className={`af-btn af-btn-icon af-btn-ghost af-header-action${needsUpdate ? ' has-update' : ''}`} type="button" onClick={() => setOptionsOpen(true)} aria-label="Artifact options"><MoreIcon /></button>
       </header>
 
-      <main className="af-detail-scroll">
-        <div className="af-detail-page">
-          <div className={`af-preview-shell${fullscreen ? ' is-fullscreen' : ''}`}>
-            <div className="af-preview-toolbar">
-              <div className="af-preview-context">
-                <span>Version v{previewVersion}</span>
-                <div className="af-segment" role="group" aria-label="Artifact view">
-                  <button className={viewMode === 'preview' ? 'is-selected' : ''} type="button" aria-pressed={viewMode === 'preview'} onClick={() => setViewMode('preview')}>Preview</button>
-                  <button className={viewMode === 'source' ? 'is-selected' : ''} type="button" aria-pressed={viewMode === 'source'} onClick={() => setViewMode('source')}>Source</button>
-                </div>
-              </div>
-              <div className="af-preview-tools">
-                <button
-                  className="af-btn af-btn-icon af-preview-tool"
-                  type="button"
-                  onClick={() => viewMode === 'source' ? setSourceReloadTick((n) => n + 1) : setReloadTick((n) => n + 1)}
-                  aria-label={viewMode === 'source' ? 'Reload source' : 'Reload preview'}
-                >
-                  <ReloadIcon size={17} />
-                </button>
-                <button className="af-btn af-btn-icon af-preview-tool" type="button" onClick={toggleFullscreen} aria-label={fullscreen ? `Exit fullscreen ${viewMode}` : `Open fullscreen ${viewMode}`}><ExpandIcon size={17} /></button>
-              </div>
-            </div>
-            {viewMode === 'preview'
-              ? (
-                <ArtifactFrame
-                  artifactId={record.id}
-                  version={previewVersion}
-                  storage={storage}
-                  onPreviewFrame={onPreviewFrame}
-                  writable={previewVersion === currentVersion}
-                  reloadTick={reloadTick}
-                  fullscreen={fullscreen}
-                />
-              )
-              : (
-                <div className="af-source" aria-label={`HTML source, version ${previewVersion}`}>
-                  {(sourceState.key !== sourceKey || sourceState.status === 'loading') && (
-                    <div className="af-source-state" aria-label="Loading artifact source"><div className="af-skeleton af-skeleton-window" /></div>
-                  )}
-                  {sourceState.key === sourceKey && sourceState.status === 'error' && (
-                    <div className="af-preview-error" role="status">
-                      <div className="af-preview-error-mark" aria-hidden="true">!</div>
-                      <strong>Source unavailable</strong>
-                      <p>{sourceState.message}</p>
-                      <button className="af-btn af-btn-secondary" type="button" onClick={() => setSourceReloadTick((n) => n + 1)}><ReloadIcon size={17} /> Reload</button>
-                    </div>
-                  )}
-                  {sourceState.key === sourceKey && sourceState.status === 'ready' && <pre><code>{sourceState.html}</code></pre>}
+      <main className="af-artifact-stage">
+        {viewMode === 'preview'
+          ? (
+            <ArtifactFrame
+              artifactId={record.id}
+              version={previewVersion}
+              storage={storage}
+              onPreviewFrame={onPreviewFrame}
+              writable={previewVersion === currentVersion}
+            />
+          )
+          : (
+            <div className="af-source" aria-label={`HTML source, version ${previewVersion}`}>
+              {(sourceState.key !== sourceKey || sourceState.status === 'loading') && (
+                <div className="af-source-state" aria-label="Loading artifact source"><div className="af-skeleton af-skeleton-window" /></div>
+              )}
+              {sourceState.key === sourceKey && sourceState.status === 'error' && (
+                <div className="af-preview-error" role="status">
+                  <div className="af-preview-error-mark" aria-hidden="true">!</div>
+                  <strong>Source unavailable</strong>
+                  <p>{sourceState.message}</p>
+                  <button className="af-btn af-btn-secondary" type="button" onClick={() => setSourceReloadTick((n) => n + 1)}><ReloadIcon size={17} /> Reload</button>
                 </div>
               )}
-          </div>
-
-          <section className="af-detail-meta" aria-label="Artifact information">
-            {record.description && <p className="af-detail-description">{record.description}</p>}
-            <div className="af-meta-row">
-              <span className="af-chip">Version {currentVersion}</span>
-              {share?.published && <span className="af-badge af-badge-shared">Shared v{share.shared_version}</span>}
+              {sourceState.key === sourceKey && sourceState.status === 'ready' && <pre><code>{sourceState.html}</code></pre>}
             </div>
-            {showChatTitle && <p className="af-origin">From: <strong>{fromLabel}</strong></p>}
-          </section>
-
-          <section className="af-actions" aria-label="Artifact actions">
-            <button className="af-action" type="button" onClick={() => setShareOpen(true)}><span className="af-action-icon"><ShareIcon /></span><span><strong>{share?.published ? 'Manage sharing' : 'Share'}</strong><small>{share?.published ? (needsUpdate ? `Update to v${currentVersion}` : 'Public link is current') : 'Publish a snapshot'}</small></span></button>
-            <button className={`af-action${deletedChat ? ' is-disabled' : ''}`} type="button" aria-disabled={deletedChat} onClick={openOriginChat}><span className="af-action-icon"><ChatIcon /></span><span><strong>Open origin chat</strong><small>{deletedChat ? 'Chat deleted' : 'Return to the conversation'}</small></span></button>
-          </section>
-
-          <VersionTimeline
-            versions={record.versions}
-            currentVersion={currentVersion}
-            selectedVersion={previewVersion}
-            onSelect={(version) => setSelectedVersion(version === currentVersion ? null : version)}
-          />
-        </div>
+          )}
       </main>
 
       <ShareSheet open={shareOpen} artifact={record} share={publicShare} busy={Boolean(busy)} needsUpdate={needsUpdate} onClose={() => setShareOpen(false)} onPublish={publish} onCopy={copyLink} onStop={stopSharing} />
       <ArtifactOptionsSheet
         open={optionsOpen}
         busy={Boolean(busy)}
+        description={record.description}
+        originLabel={deletedChat ? 'Chat deleted' : showChatTitle && fromLabel ? `From: ${fromLabel}` : 'Return to the conversation'}
+        originDisabled={deletedChat}
+        shareLabel={share?.published ? 'Manage sharing' : 'Share'}
+        shareDescription={share?.published ? (needsUpdate ? `Update public link to v${currentVersion}` : 'Public link is current') : 'Publish a public snapshot'}
         onClose={() => setOptionsOpen(false)}
+        onShare={() => {
+          setOptionsOpen(false)
+          setShareOpen(true)
+        }}
+        onOpenOrigin={openOriginChat}
         onCopy={copyHtml}
         onDownload={downloadHtml}
         onDelete={() => {
           setOptionsOpen(false)
           setDeleteOpen(true)
         }}
+      />
+      <VersionSheet
+        open={versionsOpen}
+        versions={record.versions}
+        currentVersion={currentVersion}
+        selectedVersion={previewVersion}
+        onSelect={(version) => setSelectedVersion(version === currentVersion ? null : version)}
+        onClose={() => setVersionsOpen(false)}
       />
       <DeleteSheet open={deleteOpen} title={record.title} busy={busy === 'delete'} onClose={() => setDeleteOpen(false)} onDelete={deleteArtifact} />
       {toast && <div className={`af-toast${toast.tone ? ` is-${toast.tone}` : ''}`} role="status" key={toast.key}>{toast.message}</div>}

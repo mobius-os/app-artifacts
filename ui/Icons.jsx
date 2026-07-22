@@ -47,6 +47,10 @@ export function CopyIcon(props) {
   return <Svg {...props}><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></Svg>
 }
 
+export function CodeIcon(props) {
+  return <Svg {...props}><path d="m8 6-6 6 6 6" /><path d="m16 6 6 6-6 6" /></Svg>
+}
+
 export function DownloadIcon(props) {
   return <Svg {...props}><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></Svg>
 }
@@ -57,6 +61,10 @@ export function ExpandIcon(props) {
 
 export function MoreIcon(props) {
   return <Svg {...props}><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" /></Svg>
+}
+
+export function EyeIcon(props) {
+  return <Svg {...props}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></Svg>
 }
 
 export function ReloadIcon(props) {
