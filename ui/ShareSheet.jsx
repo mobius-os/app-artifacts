@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import { ArrowUpRightIcon, CopyIcon, DownloadIcon, ShareIcon, TrashIcon } from './Icons.jsx'
+import { ArrowUpRightIcon, ChatIcon, CopyIcon, DownloadIcon, ShareIcon, TrashIcon } from './Icons.jsx'
 
 function useSheetFocus(open, busy, onClose) {
   const sheetRef = useRef(null)
@@ -123,7 +123,14 @@ export function ShareSheet({
 export function ArtifactOptionsSheet({
   open,
   busy,
+  description,
+  originLabel,
+  originDisabled,
+  shareLabel,
+  shareDescription,
   onClose,
+  onShare,
+  onOpenOrigin,
   onCopy,
   onDownload,
   onDelete,
@@ -142,7 +149,16 @@ export function ArtifactOptionsSheet({
       >
         <div className="af-sheet-handle" aria-hidden="true" />
         <h2 id="af-options-title">Artifact options</h2>
+        {description && <p className="af-sheet-copy af-options-description">{description}</p>}
         <div className="af-option-list">
+          <button className="af-option" type="button" onClick={onShare} disabled={busy}>
+            <span className="af-option-icon" aria-hidden="true"><ShareIcon /></span>
+            <span><strong>{shareLabel}</strong><small>{shareDescription}</small></span>
+          </button>
+          <button className="af-option" type="button" onClick={onOpenOrigin} disabled={busy || originDisabled}>
+            <span className="af-option-icon" aria-hidden="true"><ChatIcon /></span>
+            <span><strong>Open origin chat</strong><small>{originLabel}</small></span>
+          </button>
           <button className="af-option" type="button" onClick={onCopy} disabled={busy}>
             <span className="af-option-icon" aria-hidden="true"><CopyIcon /></span>
             <span><strong>Copy HTML</strong><small>Copy the selected version as plain text</small></span>

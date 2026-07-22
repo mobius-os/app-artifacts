@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { CheckIcon, ChevronDownIcon } from './Icons.jsx'
 
@@ -57,5 +57,78 @@ export function VersionTimeline({ versions, currentVersion, selectedVersion, onS
         })}
       </div>}
     </details>
+  )
+}
+
+export function VersionSheet({ open, versions, currentVersion, selectedVersion, onSelect, onClose }) {
+  const sheetRef = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const previous = document.activeElement
+    const timer = window.setTimeout(() => sheetRef.current?.querySelector('button')?.focus(), 0)
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('keydown', onKeyDown)
+      if (previous instanceof HTMLElement) previous.focus()
+    }
+  }, [open, onClose])
+
+  if (!open) return null
+  const ordered = [...(Array.isArray(versions) ? versions : [])]
+    .sort((a, b) => Number(b.v) - Number(a.v))
+
+  return (
+    <div className="af-scrim" role="presentation" onClick={onClose}>
+      <section
+        ref={sheetRef}
+        className="af-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="af-versions-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="af-sheet-handle" aria-hidden="true" />
+        <h2 id="af-versions-title">Version history</h2>
+        <div className="af-timeline af-version-sheet-list">
+          {ordered.map((item) => {
+            const selected = Number(item.v) === Number(selectedVersion)
+            return (
+              <button
+                key={item.v}
+                type="button"
+                className={`af-version${selected ? ' is-selected' : ''}`}
+                onClick={() => {
+                  onSelect(Number(item.v))
+                  onClose()
+                }}
+                aria-pressed={selected}
+              >
+                <span className="af-version-rail" aria-hidden="true">
+                  <span className="af-version-dot">{selected && <CheckIcon size={12} />}</span>
+                </span>
+                <span className="af-version-content">
+                  <span className="af-version-title">
+                    Version {item.v}
+                    {Number(item.v) === Number(currentVersion) && <span className="af-chip">Current</span>}
+                  </span>
+                  {item.note && <span className="af-version-note">{item.note}</span>}
+                  <span className="af-version-meta">{relativeTime(item.created_at)} · {formatBytes(item.bytes)}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="af-sheet-actions">
+          <button className="af-btn af-btn-secondary" type="button" onClick={onClose}>Done</button>
+        </div>
+      </section>
+    </div>
   )
 }

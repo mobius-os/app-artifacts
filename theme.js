@@ -78,7 +78,21 @@ export const CSS = `
 .af-brand-copy h1 { margin: 0; font-size: 1.125rem; line-height: 1.2; font-weight: 720; letter-spacing: -0.015em; }
 .af-brand-copy p { margin: 0.125rem 0 0; color: var(--muted); font-size: 0.75rem; line-height: 1.25; }
 .af-detail-header { gap: 0.5rem; }
-.af-detail-heading { flex: 1; min-width: 0; text-align: center; }
+.af-detail-heading {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  font-family: var(--font);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.af-detail-heading:hover { background: var(--accent-dim); }
 .af-detail-heading h1 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; line-height: 1.25; font-weight: 680; }
 .af-detail-heading span { display: block; margin-top: 0.125rem; color: var(--muted); font: 500 0.6875rem/1 var(--mono); }
 /* /mobius-ui:Header */
@@ -218,70 +232,53 @@ export const CSS = `
 .af-skeleton-window { width: 100%; height: 100%; min-height: 18rem; border-radius: 0; }
 @keyframes af-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 
-.af-preview-shell {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 55dvh;
-  min-height: 20rem;
-  max-height: 40rem;
-  margin: 1rem 0 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 0.875rem;
-  background: var(--surface);
-}
-.af-preview-shell.is-fullscreen {
-  position: absolute;
-  inset: 0;
-  z-index: 120;
-  width: auto;
-  height: auto;
-  min-height: 0;
-  max-height: none;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-}
-.af-preview-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  min-height: 3rem;
-  padding: 0.25rem 0.375rem 0.25rem 0.875rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--muted);
-  font: 550 0.75rem/1 var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-.af-preview-context { display: flex; min-width: 0; align-items: center; gap: 0.625rem; }
-.af-preview-context > span { flex: 0 0 auto; }
-.af-preview-tools { display: flex; align-items: center; gap: 0.125rem; }
-.af-segment {
+.af-view-toggle {
   display: inline-flex;
-  align-items: center;
+  flex: 0 0 auto;
+  gap: 0.125rem;
   padding: 0.125rem;
   border: 1px solid var(--border);
   border-radius: 0.625rem;
-  background: var(--surface);
+  background: var(--bg);
 }
-.af-segment button {
-  min-height: 2.75rem;
-  padding: 0.5rem 0.75rem;
+.af-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
   border: 0;
   border-radius: 0.5rem;
   background: transparent;
   color: var(--muted);
-  font: 650 0.8125rem/1 var(--font);
   cursor: pointer;
   touch-action: manipulation;
 }
-.af-segment button:hover { color: var(--text); }
-.af-segment button.is-selected { background: var(--accent-dim); color: var(--accent); }
-.af-preview-tool { border-color: transparent; background: transparent; color: var(--muted); }
-.af-preview-tool:hover { background: var(--accent-dim); color: var(--text); }
+.af-view-toggle button.is-active { background: var(--surface2, var(--surface)); color: var(--text); }
+.af-view-toggle button:active { background: var(--surface2, var(--surface)); }
+@media (hover: hover) {
+  .af-view-toggle button:hover:not(.is-active) { background: var(--surface); color: var(--text); }
+}
+.af-header-action { position: relative; }
+.af-header-action.has-update::after {
+  content: '';
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+}
+.af-artifact-stage {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
 .af-preview {
   position: relative;
   flex: 1;
@@ -305,6 +302,8 @@ export const CSS = `
 }
 .af-source code { font: inherit; }
 .af-source-state { height: 100%; }
+.af-version-sheet-list { max-height: min(60dvh, 32rem); overflow-y: auto; }
+.af-options-description { margin-top: -0.25rem; }
 .af-preview-error {
   display: flex;
   width: 100%;
@@ -504,16 +503,6 @@ export const CSS = `
   .af-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; padding-block: 1rem; }
   .af-action { align-items: flex-start; min-height: 7.25rem; padding: 0.875rem; border: 1px solid var(--border); border-radius: 0.75rem; }
   .af-action:last-child { border-bottom: 1px solid var(--border); }
-}
-
-@media (max-height: 36rem) {
-  .af-preview-shell { height: 50dvh; min-height: 15rem; }
-}
-
-@media (max-width: 29rem) {
-  .af-preview-toolbar { align-items: stretch; flex-direction: column; padding: 0.375rem; }
-  .af-preview-context { justify-content: space-between; }
-  .af-preview-tools { justify-content: flex-end; }
 }
 
 /* mobius-ui:ReducedMotion — app-owned. */

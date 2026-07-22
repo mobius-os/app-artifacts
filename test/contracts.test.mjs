@@ -33,6 +33,19 @@ test('source view renders HTML as text inside pre and code elements', async () =
   assert.doesNotMatch(source, /dangerouslySetInnerHTML/)
 })
 
+test('artifact detail is the single full-height preview surface', async () => {
+  const detail = await readSource('ui/Detail.jsx')
+  const theme = await readSource('theme.js')
+  assert.match(detail, /<main className="af-artifact-stage">/)
+  assert.match(detail, /onShare=\{\(\) => \{[\s\S]*?setOptionsOpen\(false\)[\s\S]*?setShareOpen\(true\)/)
+  assert.doesNotMatch(detail, /toggleFullscreen|artifact-preview|ExpandIcon/)
+  assert.doesNotMatch(detail, /Reload preview|Version v\{previewVersion\}|af-preview-toolbar/)
+  assert.match(detail, /aria-label="Preview"[\s\S]*?<EyeIcon/)
+  assert.match(detail, /aria-label="Source"[\s\S]*?<CodeIcon/)
+  assert.match(theme, /\.af-artifact-stage\s*\{[\s\S]*?flex:\s*1;[\s\S]*?min-height:\s*0;/)
+  assert.doesNotMatch(theme, /\.af-preview-shell\.is-fullscreen/)
+})
+
 test('manifest keeps the Artifacts system prompt wiring', async () => {
   const manifest = JSON.parse(await readSource('mobius.json'))
   assert.equal(manifest.system_app, true)

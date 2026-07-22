@@ -9,7 +9,6 @@ export function ArtifactFrame({
   onPreviewFrame,
   writable = true,
   reloadTick = 0,
-  fullscreen = false,
 }) {
   const [state, setState] = useState({ status: 'loading', html: null, message: '' })
   const [localReload, setLocalReload] = useState(0)
@@ -61,7 +60,7 @@ export function ArtifactFrame({
   }, [artifactId, onPreviewFrame, writable, preview.sessionKey])
 
   return (
-    <div className={`af-preview${fullscreen ? ' is-fullscreen' : ''}`}>
+    <div className="af-preview">
       {state.status === 'loading' && (
         <div className="af-preview-loading" aria-label="Loading artifact preview">
           <div className="af-skeleton af-skeleton-window" />
