@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   artifactFilename,
   injectArtifactStorageShim,
@@ -6,14 +6,12 @@ import {
   publishedShare,
   stoppedShare,
   versionPath,
-  isValidShareToken,
-  recoveredShare,
 } from '../domain.js'
 import { loadChatTitles } from '../storage.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
 import { VersionSheet } from './VersionTimeline.jsx'
 import { ArtifactOptionsSheet, DeleteSheet, ShareSheet } from './ShareSheet.jsx'
-import { createSharePollGate } from './sharePolling.js'
+import { createDetailSync } from './detailSync.js'
 import {
   ArrowLeftIcon,
   CodeIcon,
@@ -59,6 +57,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState(null)
   const [chatInfo, setChatInfo] = useState({ permission: 'loading', title: null })
+  const detailSyncRef = useRef(null)
 
   const showToast = useCallback((message, tone = '') => {
     setToast({ message, tone, key: Date.now() })
@@ -71,19 +70,13 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
   }, [toast])
 
   useEffect(() => {
-    let active = true
-    let refreshing = false
     setStatus('loading')
     setShare(null)
     setShareKnown(false)
     setSelectedVersion(null)
     setViewMode('preview')
     setSourceState({ key: '', status: 'idle', html: '', message: '' })
-    const recordPath = `artifacts/${artifactId}.json`
-    const sharePath = `shares/${artifactId}.json`
-    const sharePolling = createSharePollGate()
     const acceptRecord = (value) => {
-      if (!active) return
       setRecord((current) => {
         if (!value) return null
         if (!current || current.id !== value.id) return value
@@ -95,87 +88,35 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       })
       setStatus(value ? 'ready' : 'missing')
     }
-    // The platform writes a publish token hint into the app's OWN storage, so
-    // an absent shares/<id>.json does not prove nothing is public: a failed
-    // record write, or a lost record, would otherwise strand a live page with
-    // no in-app way to revoke it. Read the hint once per artifact and recover
-    // the token from it.
-    let hintChecked = false
-    let hintCheck = null
-    const recoverFromHint = async () => {
-      if (hintChecked) return null
-      if (hintCheck) return hintCheck
-      hintCheck = (async () => {
-        let raw
-        try {
-          raw = await storage.getText(
-            `projects/${artifactId}/build/publish-token.txt`,
-          )
-        } catch {
-          // Transient read failure: do NOT latch, so the next poll retries rather
-          // than permanently giving up on recovering a still-live share.
-          return null
-        } finally {
-          hintCheck = null
-        }
-        hintChecked = true
-        const token = String(raw || '').trim()
-        if (!isValidShareToken(token)) return null
-        return recoveredShare({ id: artifactId, token })
-      })()
-      return hintCheck
-    }
-    const tryHintRecovery = () => {
-      recoverFromHint().then((recovered) => {
-        if (!active || !recovered || !sharePolling.isMissing()) return
-        setShare((current) => (current?.published ? current : recovered))
-      })
-    }
     const acceptShare = (value) => {
-      if (!active) return
-      sharePolling.observe(value)
       if (value) {
         setShare(value)
         setShareKnown(true)
         return
       }
-      // Keep a recovered share visible: the poll re-reads the still-missing
-      // record every few seconds, and clearing would make Stop sharing flicker
-      // away from a page that is genuinely still live.
+      // Keep a recovered share visible: bounded absence rechecks still return
+      // null, and clearing would make Stop sharing disappear from a page that
+      // is genuinely still live.
       setShare((current) => (current?.recovered ? current : null))
       setShareKnown(true)
-      tryHintRecovery()
     }
-    const unsubscribeRecord = storage.subscribe(recordPath, acceptRecord)
-    const unsubscribeShare = storage.subscribe(sharePath, acceptShare)
-    storage.getFresh(recordPath).then(acceptRecord).catch((error) => {
-      if (active) {
+    const sync = createDetailSync({
+      artifactId,
+      storage,
+      onRecord: acceptRecord,
+      onRecordError: (error) => {
         setStatus('error')
         showToast(error?.message || 'Artifact could not be loaded.', 'error')
-      }
+      },
+      onShare: acceptShare,
+      onRecoveredShare: (recovered) => {
+        setShare((current) => (current?.published ? current : recovered))
+      },
     })
-    storage.getFresh(sharePath).then(acceptShare).catch(() => {})
-    const refresh = async ({ forceShare = false } = {}) => {
-      if (refreshing || document.visibilityState === 'hidden') return
-      refreshing = true
-      try {
-        const readShare = sharePolling.shouldRead(Date.now(), { force: forceShare })
-        const [nextRecord, nextShareResult] = await Promise.all([
-          storage.getFresh(recordPath),
-          readShare
-            ? storage.getFresh(sharePath)
-              .then((value) => ({ loaded: true, value }))
-              .catch(() => ({ loaded: false, value: null }))
-            : Promise.resolve({ loaded: false, value: null }),
-        ])
-        acceptRecord(nextRecord)
-        if (nextShareResult.loaded) acceptShare(nextShareResult.value)
-        else if (sharePolling.isMissing()) tryHintRecovery()
-      } catch {
-        // Keep the subscribed last-known record; the next visible poll retries.
-      } finally {
-        refreshing = false
-      }
+    detailSyncRef.current = sync
+    sync.start()
+    const refresh = (options) => {
+      if (document.visibilityState !== 'hidden') void sync.refresh(options)
     }
     const onVisibility = () => {
       if (document.visibilityState === 'visible') refresh({ forceShare: true })
@@ -185,12 +126,11 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
-      active = false
       window.clearInterval(timer)
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
-      unsubscribeRecord?.()
-      unsubscribeShare?.()
+      if (detailSyncRef.current === sync) detailSyncRef.current = null
+      sync.dispose()
     }
   }, [artifactId, showToast, storage])
 
@@ -250,6 +190,15 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     await storage.setText(`projects/${record.id}/build/site/index.html`, publishedHtml)
   }
 
+  function reflectLocalShare(next) {
+    if (detailSyncRef.current) {
+      detailSyncRef.current.acceptLocalShare(next)
+    } else {
+      setShare(next)
+      setShareKnown(true)
+    }
+  }
+
   async function publish(version) {
     if (!record || busy) return
     setBusy('publish')
@@ -260,14 +209,13 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       // The snapshot is live now; that is the source of truth. Reflect it in
       // the UI immediately, then persist the share record BEST-EFFORT. If that
       // write fails, the platform already wrote a token hint into the project
-      // that recoverFromHint reads back on the next load — so there is nothing
+      // that the detail synchronizer reads back — so there is nothing
       // to compensate, and the old rollback dance (which also mis-staged a
       // recovered share's null version) is gone.
       const next = publishedShare({
         id: record.id, version, token: result.token, url: result.url,
       })
-      setShare(next)
-      setShareKnown(true)
+      reflectLocalShare(next)
       showToast(updating ? `Shared version updated to v${version}.` : 'Public link created.', 'success')
       try {
         await storage.setJSON(`shares/${record.id}.json`, next)
@@ -288,8 +236,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       // record save cannot leave the UI stuck showing a live share for a link
       // that is already gone.
       const next = stoppedShare(share)
-      setShare(next)
-      setShareKnown(true)
+      reflectLocalShare(next)
       showToast('Public link removed.', 'success')
       try {
         await storage.setJSON(`shares/${record.id}.json`, next)

@@ -24,6 +24,7 @@
     "theme.js",
     "preview/ArtifactFrame.jsx",
     "ui/ArtifactCard.jsx",
+    "ui/detailSync.js",
     "ui/Detail.jsx",
     "ui/Empty.jsx",
     "ui/Gallery.jsx",
