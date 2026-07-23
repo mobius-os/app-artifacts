@@ -26,10 +26,19 @@ export function createDetailSync({
 
   let recordGeneration = 0
   let recordRead = null
+  let recordFirstSubscriptionSeen = false
+  let recordInitialFreshSettled = false
+  let recordInitialFreshSucceeded = false
+  let recordInitialFreshGeneration = 0
+  let recordProvisionalApplied = false
 
   let shareGeneration = 0
   let shareRead = null
   let trailingForcedShareRead = false
+  let shareFirstSubscriptionSeen = false
+  let shareInitialFreshSettled = false
+  let shareInitialFreshSucceeded = false
+  let shareInitialFreshGeneration = 0
 
   let hintRead = null
   let nextHintCheckAt = 0
@@ -40,6 +49,26 @@ export function createDetailSync({
     if (!active) return
     recordGeneration += 1
     onRecord(value)
+  }
+
+  function acceptRecordSubscription(value) {
+    if (!active) return
+    if (recordFirstSubscriptionSeen) {
+      acceptRecord(value)
+      return
+    }
+    recordFirstSubscriptionSeen = true
+    if (!recordInitialFreshSettled) {
+      // runtime.subscribe emits its cache immediately. It is useful for fast
+      // paint/offline fallback, but remains provisional until getFresh settles.
+      recordProvisionalApplied = value != null
+      onRecord(value)
+    } else if (
+      !recordInitialFreshSucceeded
+      && recordGeneration === recordInitialFreshGeneration
+    ) {
+      acceptRecord(value)
+    }
   }
 
   function acceptObservedShare(value) {
@@ -69,18 +98,56 @@ export function createDetailSync({
     onShare(value)
   }
 
-  async function refreshRecord({ reportError = false } = {}) {
+  function acceptShareSubscription(value) {
+    if (!active) return
+    if (shareFirstSubscriptionSeen) {
+      acceptObservedShare(value)
+      return
+    }
+    shareFirstSubscriptionSeen = true
+    if (!shareInitialFreshSettled) {
+      // Like the record subscription, this first cache-backed value is only a
+      // provisional paint. It must not own the generation over getFresh.
+      const wasMissing = sharePolling.isMissing()
+      sharePolling.observe(value, now())
+      if (!(value == null && wasMissing)) {
+        if (value != null) lastRecoveredToken = null
+        onShare(value)
+      }
+      if (value == null) void refreshHint({ force: true })
+    } else if (
+      !shareInitialFreshSucceeded
+      && shareGeneration === shareInitialFreshGeneration
+    ) {
+      acceptObservedShare(value)
+    }
+  }
+
+  async function refreshRecord({ reportError = false, initial = false } = {}) {
     if (!active) return
     if (recordRead) return recordRead
 
     const generation = recordGeneration
+    if (initial) recordInitialFreshGeneration = generation
     let request
     request = (async () => {
       try {
         const value = await storage.getFresh(recordPath)
+        if (initial) {
+          recordInitialFreshSettled = true
+          recordInitialFreshSucceeded = true
+        }
         if (active && generation === recordGeneration) acceptRecord(value)
       } catch (error) {
-        if (active && reportError && generation === recordGeneration) onRecordError(error)
+        if (initial) recordInitialFreshSettled = true
+        if (
+          active
+          && reportError
+          && !recordProvisionalApplied
+          && generation === recordGeneration
+        ) {
+          onRecordError(error)
+        }
       } finally {
         if (recordRead === request) recordRead = null
       }
@@ -89,7 +156,7 @@ export function createDetailSync({
     return request
   }
 
-  async function refreshShare({ force = false } = {}) {
+  async function refreshShare({ force = false, initial = false } = {}) {
     if (!active) return
     if (shareRead) {
       if (force) trailingForcedShareRead = true
@@ -101,12 +168,18 @@ export function createDetailSync({
     }
 
     const generation = shareGeneration
+    if (initial) shareInitialFreshGeneration = generation
     let request
     request = (async () => {
       try {
         const value = await storage.getFresh(sharePath)
+        if (initial) {
+          shareInitialFreshSettled = true
+          shareInitialFreshSucceeded = true
+        }
         if (active && generation === shareGeneration) acceptObservedShare(value)
       } catch {
+        if (initial) shareInitialFreshSettled = true
         // A failed due read stays due. The next detail tick retries it.
       } finally {
         if (shareRead === request) shareRead = null
@@ -176,10 +249,10 @@ export function createDetailSync({
   function start() {
     if (!active || started) return
     started = true
-    unsubscribeRecord = storage.subscribe(recordPath, acceptRecord)
-    unsubscribeShare = storage.subscribe(sharePath, acceptObservedShare)
-    void refreshRecord({ reportError: true })
-    void refreshShare({ force: true })
+    unsubscribeRecord = storage.subscribe(recordPath, acceptRecordSubscription)
+    unsubscribeShare = storage.subscribe(sharePath, acceptShareSubscription)
+    void refreshRecord({ reportError: true, initial: true })
+    void refreshShare({ force: true, initial: true })
   }
 
   function dispose() {

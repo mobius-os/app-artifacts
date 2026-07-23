@@ -74,15 +74,21 @@ test('stale detail reads cannot overwrite subscription or local state', async ()
   const staleRecord = state.recordCalls()[0]
   const staleShare = state.shareCalls()[0]
 
+  const recordSubscription = state.subscriptions.get('artifacts/deck-01.json')
+  const shareSubscription = state.subscriptions.get('shares/deck-01.json')
+  recordSubscription({ id: 'deck-01', current_version: 0 })
+  shareSubscription({ project_id: 'deck-01', published: false })
   const subscribedRecord = { id: 'deck-01', current_version: 2 }
   const subscribed = { project_id: 'deck-01', published: true, shared_version: 2 }
-  state.subscriptions.get('artifacts/deck-01.json')(subscribedRecord)
-  state.subscriptions.get('shares/deck-01.json')(subscribed)
+  recordSubscription(subscribedRecord)
+  shareSubscription(subscribed)
   staleRecord.resolve({ id: 'deck-01', current_version: 1 })
   staleShare.resolve(null)
   await flush()
-  assert.deepEqual(state.records, [subscribedRecord])
-  assert.deepEqual(state.shares, [subscribed])
+  assert.equal(state.records.length, 2)
+  assert.deepEqual(state.records.at(-1), subscribedRecord)
+  assert.equal(state.shares.length, 2)
+  assert.deepEqual(state.shares.at(-1), subscribed)
 
   void state.sync.refresh({ forceShare: true })
   const secondShareRead = state.shareCalls()[1]
@@ -90,7 +96,50 @@ test('stale detail reads cannot overwrite subscription or local state', async ()
   state.sync.acceptLocalShare(local)
   secondShareRead.resolve({ project_id: 'deck-01', published: true, shared_version: 1 })
   await flush()
-  assert.deepEqual(state.shares, [subscribed, local])
+  assert.equal(state.shares.length, 3)
+  assert.deepEqual(state.shares.at(-1), local)
+  state.sync.dispose()
+})
+
+test('cache-first subscription values before getFresh remain provisional', async () => {
+  const state = harness()
+  state.sync.start()
+  const cachedRecord = { id: 'deck-01', current_version: 1 }
+  const cachedShare = { project_id: 'deck-01', published: false }
+  state.subscriptions.get('artifacts/deck-01.json')(cachedRecord)
+  state.subscriptions.get('shares/deck-01.json')(cachedShare)
+  assert.deepEqual(state.records, [cachedRecord])
+  assert.deepEqual(state.shares, [cachedShare])
+
+  const freshRecord = { id: 'deck-01', current_version: 2 }
+  const freshShare = { project_id: 'deck-01', published: true, shared_version: 2 }
+  state.recordCalls()[0].resolve(freshRecord)
+  state.shareCalls()[0].resolve(freshShare)
+  await flush()
+  assert.deepEqual(state.records, [cachedRecord, freshRecord])
+  assert.deepEqual(state.shares, [cachedShare, freshShare])
+  state.sync.dispose()
+})
+
+test('late first cache subscription values cannot overwrite getFresh', async () => {
+  const state = harness()
+  state.sync.start()
+  const freshRecord = { id: 'deck-01', current_version: 2 }
+  const freshShare = { project_id: 'deck-01', published: true, shared_version: 2 }
+  state.recordCalls()[0].resolve(freshRecord)
+  state.shareCalls()[0].resolve(freshShare)
+  await flush()
+
+  state.subscriptions.get('artifacts/deck-01.json')({
+    id: 'deck-01',
+    current_version: 1,
+  })
+  state.subscriptions.get('shares/deck-01.json')({
+    project_id: 'deck-01',
+    published: false,
+  })
+  assert.deepEqual(state.records, [freshRecord])
+  assert.deepEqual(state.shares, [freshShare])
   state.sync.dispose()
 })
 
