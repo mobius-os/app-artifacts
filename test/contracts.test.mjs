@@ -138,7 +138,7 @@ test('the share flow reflects live state before persisting the record', async ()
 
   for (const fn of ['publish', 'stopSharing']) {
     const body = source.slice(source.indexOf(`async function ${fn}(`))
-    const setShare = body.indexOf('setShare(next)')
+    const setShare = body.indexOf('reflectLocalShare(next)')
     const persist = body.indexOf('setJSON(`shares/')
     assert.ok(setShare !== -1 && persist !== -1, `${fn} must set share + persist`)
     assert.ok(setShare < persist, `${fn} must reflect state before persisting`)
@@ -151,17 +151,9 @@ test('the share flow reflects live state before persisting the record', async ()
   }
 })
 
-test('hint recovery does not latch on a transient read failure', async () => {
-  // hintChecked must be set only AFTER a successful read, so a transient
-  // failure retries on the next poll instead of permanently giving up on a
-  // still-live share.
+test('detail delegates polling ownership and local share mutations to one synchronizer', async () => {
   const source = await readSource('ui/Detail.jsx')
-  const fn = source.slice(
-    source.indexOf('const recoverFromHint'),
-    source.indexOf('const acceptShare'),
-  )
-  const read = fn.indexOf('getText(')
-  const latch = fn.indexOf('hintChecked = true')
-  assert.ok(read !== -1 && latch !== -1)
-  assert.ok(latch > read, 'must not latch before the hint read succeeds')
+  assert.match(source, /createDetailSync\(\{/)
+  assert.match(source, /refresh\(\{ forceShare: true \}\)/)
+  assert.match(source, /detailSyncRef\.current\.acceptLocalShare\(next\)/)
 })
