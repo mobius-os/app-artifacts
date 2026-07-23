@@ -13,6 +13,7 @@ import { loadChatTitles } from '../storage.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
 import { VersionSheet } from './VersionTimeline.jsx'
 import { ArtifactOptionsSheet, DeleteSheet, ShareSheet } from './ShareSheet.jsx'
+import { createSharePollGate } from './sharePolling.js'
 import {
   ArrowLeftIcon,
   CodeIcon,
@@ -80,6 +81,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     setSourceState({ key: '', status: 'idle', html: '', message: '' })
     const recordPath = `artifacts/${artifactId}.json`
     const sharePath = `shares/${artifactId}.json`
+    const sharePolling = createSharePollGate()
     const acceptRecord = (value) => {
       if (!active) return
       setRecord((current) => {
@@ -99,25 +101,39 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     // no in-app way to revoke it. Read the hint once per artifact and recover
     // the token from it.
     let hintChecked = false
+    let hintCheck = null
     const recoverFromHint = async () => {
       if (hintChecked) return null
-      let raw
-      try {
-        raw = await storage.getText(
-          `projects/${artifactId}/build/publish-token.txt`,
-        )
-      } catch {
-        // Transient read failure: do NOT latch, so the next poll retries rather
-        // than permanently giving up on recovering a still-live share.
-        return null
-      }
-      hintChecked = true
-      const token = String(raw || '').trim()
-      if (!isValidShareToken(token)) return null
-      return recoveredShare({ id: artifactId, token })
+      if (hintCheck) return hintCheck
+      hintCheck = (async () => {
+        let raw
+        try {
+          raw = await storage.getText(
+            `projects/${artifactId}/build/publish-token.txt`,
+          )
+        } catch {
+          // Transient read failure: do NOT latch, so the next poll retries rather
+          // than permanently giving up on recovering a still-live share.
+          return null
+        } finally {
+          hintCheck = null
+        }
+        hintChecked = true
+        const token = String(raw || '').trim()
+        if (!isValidShareToken(token)) return null
+        return recoveredShare({ id: artifactId, token })
+      })()
+      return hintCheck
+    }
+    const tryHintRecovery = () => {
+      recoverFromHint().then((recovered) => {
+        if (!active || !recovered || !sharePolling.isMissing()) return
+        setShare((current) => (current?.published ? current : recovered))
+      })
     }
     const acceptShare = (value) => {
       if (!active) return
+      sharePolling.observe(value)
       if (value) {
         setShare(value)
         setShareKnown(true)
@@ -128,10 +144,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       // away from a page that is genuinely still live.
       setShare((current) => (current?.recovered ? current : null))
       setShareKnown(true)
-      recoverFromHint().then((recovered) => {
-        if (!active || !recovered) return
-        setShare((current) => (current?.published ? current : recovered))
-      })
+      tryHintRecovery()
     }
     const unsubscribeRecord = storage.subscribe(recordPath, acceptRecord)
     const unsubscribeShare = storage.subscribe(sharePath, acceptShare)
@@ -142,30 +155,39 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       }
     })
     storage.getFresh(sharePath).then(acceptShare).catch(() => {})
-    const refresh = async () => {
+    const refresh = async ({ forceShare = false } = {}) => {
       if (refreshing || document.visibilityState === 'hidden') return
       refreshing = true
       try {
+        const readShare = sharePolling.shouldRead(Date.now(), { force: forceShare })
         const [nextRecord, nextShareResult] = await Promise.all([
           storage.getFresh(recordPath),
-          storage.getFresh(sharePath)
-            .then((value) => ({ loaded: true, value }))
-            .catch(() => ({ loaded: false, value: null })),
+          readShare
+            ? storage.getFresh(sharePath)
+              .then((value) => ({ loaded: true, value }))
+              .catch(() => ({ loaded: false, value: null }))
+            : Promise.resolve({ loaded: false, value: null }),
         ])
         acceptRecord(nextRecord)
         if (nextShareResult.loaded) acceptShare(nextShareResult.value)
+        else if (sharePolling.isMissing()) tryHintRecovery()
       } catch {
         // Keep the subscribed last-known record; the next visible poll retries.
       } finally {
         refreshing = false
       }
     }
-    const onVisibility = () => { if (document.visibilityState === 'visible') refresh() }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh({ forceShare: true })
+    }
+    const onFocus = () => refresh({ forceShare: true })
     const timer = window.setInterval(refresh, 3500)
+    window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
       active = false
       window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
       unsubscribeRecord?.()
       unsubscribeShare?.()

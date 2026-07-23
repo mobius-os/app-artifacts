@@ -164,4 +164,17 @@ test('hint recovery does not latch on a transient read failure', async () => {
   const latch = fn.indexOf('hintChecked = true')
   assert.ok(read !== -1 && latch !== -1)
   assert.ok(latch > read, 'must not latch before the hint read succeeds')
+  assert.match(fn, /if \(hintCheck\) return hintCheck/, 'concurrent hint checks must coalesce')
+})
+
+test('missing share polling is bounded without dropping recovery triggers', async () => {
+  const source = await readSource('ui/Detail.jsx')
+  assert.match(source, /createSharePollGate\(\)/)
+  assert.match(source, /sharePolling\.shouldRead\(Date\.now\(\), \{ force: forceShare \}\)/)
+  assert.match(source, /refresh\(\{ forceShare: true \}\)/)
+  assert.match(
+    source,
+    /!sharePolling\.isMissing\(\)/,
+    'a late hint must not replace a share record delivered by the subscription',
+  )
 })
