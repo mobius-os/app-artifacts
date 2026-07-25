@@ -11,6 +11,7 @@ import { loadChatTitles } from '../storage.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
 import { VersionSheet } from './VersionTimeline.jsx'
 import { ArtifactOptionsSheet, DeleteSheet, ShareSheet } from './ShareSheet.jsx'
+import { copyPlainText } from './clipboard.js'
 import { createDetailSync } from './detailSync.js'
 import {
   ArrowLeftIcon,
@@ -251,10 +252,9 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
   async function copyLink() {
     const url = publicShare?.url
     if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
+    if (await copyPlainText(url)) {
       showToast('Public link copied.', 'success')
-    } catch {
+    } else {
       showToast('Copy is unavailable. Open the page and copy its address.', 'error')
     }
   }
@@ -269,7 +269,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     setBusy('copy')
     try {
       const html = await selectedHtml()
-      await navigator.clipboard.writeText(html)
+      if (!await copyPlainText(html)) throw new Error('clipboard unavailable')
       setOptionsOpen(false)
       showToast('Copied.', 'success')
     } catch {
