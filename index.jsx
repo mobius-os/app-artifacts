@@ -74,8 +74,17 @@ export default function ArtifactsApp({ appId, token }) {
     setSelectedId(null)
   }, [])
 
-  const openDetail = useCallback(async (id) => {
-    if (!id || id === selectedId) return
+  const openDetail = useCallback(async (id, { ownBackEntry = true } = {}) => {
+    if (!id) return
+    if (!ownBackEntry) {
+      // The shell intent already owns the outer Back entry. Adding an app
+      // sentinel here would make Back stop at the gallery instead of the chat.
+      try { navRef.current?.close?.() } catch {}
+      navRef.current = null
+      setSelectedId(id)
+      return
+    }
+    if (id === selectedId) return
     try { navRef.current?.close?.() } catch {}
     const nav = window.mobius?.nav
     if (!nav?.open) {
@@ -87,10 +96,13 @@ export default function ArtifactsApp({ appId, token }) {
       setSelectedId(null)
     })
     navRef.current = handle
+    setSelectedId(id)
     const outcome = await handle.outcome
     if (navRef.current !== handle) return
-    if (outcome.status === 'owned' || outcome.status === 'standalone') setSelectedId(id)
-    else navRef.current = null
+    if (outcome.status !== 'owned' && outcome.status !== 'standalone') {
+      navRef.current = null
+      setSelectedId(null)
+    }
   }, [selectedId])
 
   useEffect(() => {
@@ -98,7 +110,7 @@ export default function ArtifactsApp({ appId, token }) {
       if (event.source !== window.parent) return
       if (event.data?.type !== 'moebius:app-intent') return
       const id = artifactIntent(event.data.intent)
-      if (id) openDetail(id)
+      if (id) void openDetail(id, { ownBackEntry: false })
     }
     window.addEventListener('message', onIntent)
     return () => window.removeEventListener('message', onIntent)
@@ -182,7 +194,7 @@ export default function ArtifactsApp({ appId, token }) {
       <style>{CSS}</style>
       {selectedId
         ? <Detail artifactId={selectedId} storage={storage} token={token} onPreviewFrame={onPreviewFrame} onClose={closeDetail} onDeleted={closeDetail} />
-        : <Gallery storage={storage} onOpen={openDetail} />}
+        : <Gallery appId={appId} storage={storage} onOpen={openDetail} />}
     </div>
   )
 }
