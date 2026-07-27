@@ -91,6 +91,29 @@ test('gallery records are id-validated before they reach storage paths', async (
   )
 })
 
+test('gallery preview enrichment cannot make the artifact catalogue unavailable', async () => {
+  const gallery = await readSource('ui/Gallery.jsx')
+  assert.match(
+    gallery,
+    /readFolder\(storage, 'shares\/'\)\.catch\(\(\) => \[\]\)/,
+    'sharing badges must fail open so records remain accessible',
+  )
+
+  const thumbnail = await readSource('ui/ArtifactThumbnail.jsx')
+  assert.match(thumbnail, /sandbox=""/, 'gallery thumbnails must not run artifact scripts')
+  assert.match(thumbnail, /default-src 'none'/, 'thumbnail documents must block network loading')
+  assert.match(thumbnail, /\.catch\(\(\) => \{[\s\S]*status: 'fallback'/)
+})
+
+test('chat deep links reuse the shell Back entry instead of adding a gallery stop', async () => {
+  const source = await readSource('index.jsx')
+  assert.match(source, /openDetail\(id, \{ ownBackEntry: false \}\)/)
+  assert.match(
+    source,
+    /if \(!ownBackEntry\) \{[\s\S]*setSelectedId\(id\)[\s\S]*return[\s\S]*\}\n    if \(id === selectedId\) return/,
+  )
+})
+
 test('a recovered share is presented without inventing a version', async () => {
   const source = await readSource('ui/ShareSheet.jsx')
   assert.match(source, /share\.recovered/, 'the sheet must branch on a recovered share')

@@ -30,6 +30,7 @@ export const CSS = `
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+  -webkit-overflow-scrolling: touch;
 }
 .af-page,
 .af-detail-page {
@@ -66,7 +67,8 @@ export const CSS = `
   background: var(--accent-dim);
   color: var(--accent);
 }
-.af-mark { width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; }
+.af-mark { width: 2.75rem; height: 2.75rem; background: transparent; }
+.af-mark img { width: 100%; height: 100%; object-fit: contain; }
 .af-brand-copy { min-width: 0; }
 .af-brand-copy h1,
 .af-detail-heading h1,
@@ -97,28 +99,115 @@ export const CSS = `
 .af-detail-heading span { display: block; margin-top: 0.125rem; color: var(--muted); font: 500 0.6875rem/1 var(--mono); }
 /* /mobius-ui:Header */
 
-.af-card-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.af-history { display: grid; gap: 1.5rem; }
+.af-skill-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 0.875rem;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+.af-skill-note-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: block;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+.af-skill-note strong,
+.af-skill-note span { display: block; }
+.af-skill-note strong { font-size: 0.8125rem; line-height: 1.3; }
+.af-skill-note div > span { margin-top: 0.1875rem; color: var(--muted); font-size: 0.6875rem; line-height: 1.45; }
+.af-date-group { min-width: 0; }
+.af-date-group > h2 {
+  margin: 0 0 0.625rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  font-weight: 760;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.af-card-list { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
 
 /* mobius-ui:Card — app-owned. */
 .af-card {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
+  position: relative;
+  display: block;
   width: 100%;
-  min-height: 7rem;
-  padding: 1rem;
+  min-height: 17rem;
+  padding: 0;
+  overflow: hidden;
   text-align: left;
   border: 1px solid var(--border);
   border-radius: 0.875rem;
   background: var(--surface);
   color: var(--text);
-  font-family: var(--font);
-  cursor: pointer;
-  touch-action: manipulation;
   transition: border-color 160ms cubic-bezier(0.25, 1, 0.5, 1), background 160ms cubic-bezier(0.25, 1, 0.5, 1), transform 100ms cubic-bezier(0.25, 1, 0.5, 1);
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 17rem;
 }
 .af-card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
 .af-card:active { transform: scale(0.992); }
+.af-card-preview {
+  position: relative;
+  width: 100%;
+  height: 10rem;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 76% 14%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 34%),
+    var(--surface2);
+  pointer-events: none;
+  isolation: isolate;
+}
+.af-card-preview iframe {
+  position: absolute;
+  inset: 0;
+  width: 200%;
+  height: 200%;
+  border: 0;
+  background: white;
+  zoom: 0.5;
+  pointer-events: none;
+}
+@supports not (zoom: 0.5) {
+  .af-card-preview iframe {
+    transform: scale(0.5);
+    transform-origin: 0 0;
+  }
+}
+.af-card-preview-loading,
+.af-card-preview-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.af-card-preview-loading { padding: 1rem; }
+.af-card-preview-loading .af-skeleton { width: 100%; height: 100%; border-radius: 0.625rem; }
+.af-card-preview-fallback { color: var(--accent); }
+.af-card-preview-fallback::before {
+  content: '';
+  position: absolute;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 1.5rem;
+  background: var(--accent-dim);
+  transform: rotate(-5deg);
+}
+.af-card-preview-fallback svg { position: relative; z-index: 1; }
+.af-card-body {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-height: 7rem;
+  padding: 0.875rem 1rem 1rem;
+}
 .af-card-icon { width: 2.75rem; height: 2.75rem; border-radius: 0.75rem; }
 .af-card-main { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 0.375rem; }
 .af-card-topline { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
@@ -134,6 +223,19 @@ export const CSS = `
 }
 .af-card-meta { display: flex; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.75rem; line-height: 1.2; }
 .af-card-chevron { display: inline-flex; color: var(--muted); opacity: 0.75; }
+.af-card-open {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.af-card-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .af-card-skeleton { cursor: default; }
 .af-skeleton-lines { display: flex; flex: 1; flex-direction: column; gap: 0.625rem; }
 /* /mobius-ui:Card */
