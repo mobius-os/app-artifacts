@@ -1,7 +1,7 @@
 {
   "id": "artifacts",
   "name": "Artifacts",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "description": "Browse, preview, version, share, view, copy, and download interactive pages and polished documents created in Möbius chats.",
   "author": "mobius-os",
   "license": "MIT",
@@ -20,6 +20,7 @@
     "artifacts-core.md",
     "artifacts.md",
     "domain.js",
+    "source-syntax.js",
     "storage.js",
     "theme.js",
     "preview/ArtifactFrame.jsx",
@@ -33,8 +34,17 @@
     "ui/Gallery.jsx",
     "ui/Icons.jsx",
     "ui/ShareSheet.jsx",
+    "ui/SourceViewer.jsx",
     "ui/sharePolling.js",
     "ui/skillIcon.js",
     "ui/VersionTimeline.jsx"
-  ]
+  ],
+  "runtime": {
+    "imports": [
+      "react",
+      "react-dom",
+      "@codemirror/state",
+      "@codemirror/view"
+    ]
+  }
 }
