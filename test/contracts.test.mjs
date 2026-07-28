@@ -27,9 +27,13 @@ test('app source contains no removed new-chat handoff', async () => {
   }
 })
 
-test('source view renders HTML as text inside pre and code elements', async () => {
+test('source view delegates immutable HTML to a read-only CodeMirror surface', async () => {
   const source = await readSource('ui/Detail.jsx')
-  assert.match(source, /<pre><code>\{sourceState\.html\}<\/code><\/pre>/)
+  const viewer = await readSource('ui/SourceViewer.jsx')
+  assert.match(source, /<SourceViewer[\s\S]*?value=\{sourceState\.html\}[\s\S]*?docKey=\{sourceKey\}/)
+  assert.match(viewer, /EditorState\.readOnly\.of\(true\)/)
+  assert.match(viewer, /EditorView\.editable\.of\(false\)/)
+  assert.match(viewer, /EditorView\.lineWrapping/)
   assert.doesNotMatch(source, /dangerouslySetInnerHTML/)
 })
 

@@ -8,7 +8,7 @@ Artifacts ships an always-on prompt fragment that nudges the agent to offer visu
 
 - Polls the app storage catalog while visible and reflects agent-created records without a reload.
 - Runs self-contained HTML in an opaque nested iframe with scripts and popups, but no same-origin access.
-- Shows immutable version history and lets the owner preview or view the source of any recorded version.
+- Shows immutable version history and lets the owner preview or inspect syntax-coloured, read-only source for any recorded version.
 - Copies selected-version HTML as plain text and downloads it with an explicit scripts warning.
 - Resolves origin chat titles through the redacted chat-log summary permission.
 - Stages a selected version through Möbius publishing, tracks its stable public URL, updates it on demand, and unpublishes it.

@@ -9,6 +9,12 @@ export const CSS = `
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
+  --code-comment: var(--muted);
+  --code-string: color-mix(in srgb, #42a85d 76%, var(--text));
+  --code-keyword: color-mix(in srgb, var(--accent) 74%, var(--text));
+  --code-literal: color-mix(in srgb, #1598bc 78%, var(--text));
+  --code-number: color-mix(in srgb, #d77a24 78%, var(--text));
+  --code-tag: color-mix(in srgb, #d94e63 76%, var(--text));
   font-kerning: normal;
   -webkit-font-smoothing: antialiased;
 }
@@ -390,19 +396,13 @@ export const CSS = `
 }
 .af-preview-frame { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
 .af-preview-loading { position: absolute; inset: 0; }
-.af-source { flex: 1; min-height: 0; overflow: auto; background: var(--bg); }
-.af-source pre {
-  min-width: 100%;
-  min-height: 100%;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 1rem;
-  color: var(--text);
-  font: 500 0.75rem/1.55 var(--mono);
-  tab-size: 2;
-  white-space: pre;
+.af-source { flex: 1; min-height: 0; overflow: hidden; background: var(--bg); }
+.af-cm-host { width: 100%; height: 100%; min-height: 0; overflow: hidden; background: var(--bg); }
+.af-cm-host .cm-scroller {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.af-source code { font: inherit; }
+.af-cm-host .cm-scroller::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .af-source-state { height: 100%; }
 .af-version-sheet-list { max-height: min(60dvh, 32rem); overflow-y: auto; }
 .af-options-description { margin-top: -0.25rem; }

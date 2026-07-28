@@ -9,6 +9,7 @@ import {
 } from '../domain.js'
 import { loadChatTitles } from '../storage.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
+import { SourceViewer } from './SourceViewer.jsx'
 import { VersionSheet } from './VersionTimeline.jsx'
 import { ArtifactOptionsSheet, DeleteSheet, ShareSheet } from './ShareSheet.jsx'
 import { copyPlainText } from './clipboard.js'
@@ -404,7 +405,13 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
                   <button className="af-btn af-btn-secondary" type="button" onClick={() => setSourceReloadTick((n) => n + 1)}><ReloadIcon size={17} /> Reload</button>
                 </div>
               )}
-              {sourceState.key === sourceKey && sourceState.status === 'ready' && <pre><code>{sourceState.html}</code></pre>}
+              {sourceState.key === sourceKey && sourceState.status === 'ready' && (
+                <SourceViewer
+                  value={sourceState.html}
+                  docKey={sourceKey}
+                  label={`HTML source, version ${previewVersion}`}
+                />
+              )}
             </div>
           )}
       </main>
