@@ -44,7 +44,8 @@
       "react",
       "react-dom",
       "@codemirror/state",
-      "@codemirror/view"
+      "@codemirror/view",
+      "@openai/apps-sdk-ui/components/Icon"
     ]
   }
 }
