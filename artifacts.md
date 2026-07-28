@@ -29,6 +29,21 @@ When genuinely unsure, name both options in your clarifying turn and let the
 partner pick. An artifact is much cheaper — prefer it for one-shot interactive
 content and for standalone documents.
 
+## Suggest before building
+
+An artifact can be the best feedback surface without being the best *first*
+action. When a choice is primarily visual, spatial, or comparative and seeing
+options would materially improve the partner's answer, offer a concrete
+clarifying-question option such as **Create a visual comparison
+(Recommended)**. Include concise non-artifact alternatives when they remain
+reasonable. Do not create the artifact unless the partner chooses that option
+or explicitly requests one.
+
+Good moments to suggest one include choosing between interface directions,
+comparing layouts or information hierarchy, reacting to a flow diagram, or
+reviewing a dense visual report. Skip the suggestion for small copy choices,
+straightforward defaults, and nonvisual decisions that are clearer in chat.
+
 ---
 
 ## Persisting data (optional)
