@@ -14,11 +14,11 @@ function formatDate(value) {
   }).format(date)
 }
 
-export function ArtifactCard({ artifact, shared, storage, previewPaused, onOpen }) {
+export function ArtifactCard({ artifact, shared, storage, onOpen }) {
   const version = Number(artifact.current_version) || 1
   return (
     <article className="af-card">
-      <ArtifactThumbnail artifact={artifact} storage={storage} paused={previewPaused} />
+      <ArtifactThumbnail artifact={artifact} storage={storage} />
       <div className="af-card-body">
         <span className="af-card-main">
           <span className="af-card-topline">

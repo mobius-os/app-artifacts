@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { versionPath } from '../domain.js'
-import { ArtifactIcon } from './Icons.jsx'
 
 function staticPreviewDocument(source) {
   const parser = new DOMParser()
@@ -16,7 +15,7 @@ function staticPreviewDocument(source) {
   return `<!doctype html>${document.documentElement.outerHTML}`
 }
 
-export function ArtifactThumbnail({ artifact, storage, paused }) {
+export function ArtifactThumbnail({ artifact, storage }) {
   const hostRef = useRef(null)
   const [visible, setVisible] = useState(false)
   const [state, setState] = useState({ status: 'idle', html: '' })
@@ -27,13 +26,13 @@ export function ArtifactThumbnail({ artifact, storage, paused }) {
     if (!host) return undefined
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) setVisible(true)
-    }, { rootMargin: '200px' })
+    }, { rootMargin: '800px 0px' })
     observer.observe(host)
     return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
-    if (!visible || paused || state.status === 'ready' || state.status === 'fallback') {
+    if (!visible || state.status === 'ready' || state.status === 'fallback') {
       return undefined
     }
     let active = true
@@ -42,26 +41,30 @@ export function ArtifactThumbnail({ artifact, storage, paused }) {
       .then((source) => {
         if (!active) return
         if (source == null) throw new Error('Preview source is missing.')
-        setState({ status: 'ready', html: staticPreviewDocument(source) })
+        setState({ status: 'staged', html: staticPreviewDocument(source) })
       })
       .catch(() => {
         if (active) setState({ status: 'fallback', html: '' })
       })
     return () => { active = false }
-  }, [artifact.id, paused, storage, version, visible])
+  }, [artifact.id, storage, version, visible])
 
   const title = useMemo(() => `Preview of ${artifact.title || 'artifact'}`, [artifact.title])
 
   return (
     <div ref={hostRef} className="af-card-preview" aria-hidden="true">
-      {(state.status === 'idle' || state.status === 'loading') && (
-        <div className="af-card-preview-loading"><div className="af-skeleton" /></div>
-      )}
-      {state.status === 'ready' && (
-        <iframe title={title} sandbox="" srcDoc={state.html} tabIndex="-1" />
-      )}
-      {state.status === 'fallback' && (
-        <div className="af-card-preview-fallback"><ArtifactIcon size={34} /></div>
+      <div className="af-card-preview-backing" />
+      {(state.status === 'staged' || state.status === 'ready') && (
+        <iframe
+          className={state.status === 'ready' ? 'is-ready' : ''}
+          title={title}
+          sandbox=""
+          srcDoc={state.html}
+          tabIndex="-1"
+          onLoad={() => setState((current) => current.status === 'staged'
+            ? { ...current, status: 'ready' }
+            : current)}
+        />
       )}
     </div>
   )

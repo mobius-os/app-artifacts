@@ -192,9 +192,15 @@ export default function ArtifactsApp({ appId, token }) {
   return (
     <div className="af-root">
       <style>{CSS}</style>
-      {selectedId
-        ? <Detail artifactId={selectedId} storage={storage} token={token} onPreviewFrame={onPreviewFrame} onClose={closeDetail} onDeleted={closeDetail} />
-        : <Gallery appId={appId} storage={storage} onOpen={openDetail} />}
+      <Gallery
+        appId={appId}
+        storage={storage}
+        onOpen={openDetail}
+        inactive={Boolean(selectedId)}
+      />
+      {selectedId && (
+        <Detail artifactId={selectedId} storage={storage} token={token} onPreviewFrame={onPreviewFrame} onClose={closeDetail} onDeleted={closeDetail} />
+      )}
     </div>
   )
 }
