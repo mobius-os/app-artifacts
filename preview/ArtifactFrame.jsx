@@ -20,7 +20,7 @@ export function ArtifactFrame({
       .then((html) => {
         if (!active) return
         if (html == null) throw new Error(`Version ${version} is missing.`)
-        setState({ status: 'ready', html, message: '' })
+        setState({ status: 'staged', html, message: '' })
       })
       .catch((error) => {
         if (active) setState({
@@ -59,9 +59,15 @@ export function ArtifactFrame({
     })
   }, [artifactId, onPreviewFrame, writable, preview.sessionKey])
 
+  const showPreview = useCallback(() => {
+    setState((current) => current.status === 'staged'
+      ? { ...current, status: 'ready' }
+      : current)
+  }, [])
+
   return (
     <div className="af-preview">
-      {state.status === 'loading' && (
+      {(state.status === 'loading' || state.status === 'staged') && (
         <div className="af-preview-loading" aria-label="Loading artifact preview">
           <div className="af-skeleton af-skeleton-window" />
         </div>
@@ -76,14 +82,15 @@ export function ArtifactFrame({
           </button>
         </div>
       )}
-      {state.status === 'ready' && (
+      {(state.status === 'staged' || state.status === 'ready') && (
         <iframe
           key={`${artifactId}:${version}:${reloadTick}:${localReload}`}
-          className="af-preview-frame"
+          className={`af-preview-frame${state.status === 'ready' ? ' is-ready' : ''}`}
           title={`Artifact preview, version ${version}`}
           sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           srcDoc={previewHtml}
           ref={registerFrame}
+          onLoad={showPreview}
         />
       )}
     </div>

@@ -27,6 +27,11 @@ export const CSS = `
   min-height: 0;
   background: var(--bg);
 }
+.af-detail {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
 .af-scroll,
 .af-detail-scroll {
   flex: 1;
@@ -154,8 +159,6 @@ export const CSS = `
   color: var(--text);
   transition: border-color 160ms cubic-bezier(0.25, 1, 0.5, 1), background 160ms cubic-bezier(0.25, 1, 0.5, 1), transform 100ms cubic-bezier(0.25, 1, 0.5, 1);
   contain: layout paint style;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 17rem;
 }
 .af-card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
 .af-card:active { transform: scale(0.992); }
@@ -176,37 +179,25 @@ export const CSS = `
   inset: 0;
   width: 200%;
   height: 200%;
+  z-index: 1;
   border: 0;
-  background: white;
+  background: transparent;
+  opacity: 0;
   zoom: 0.5;
   pointer-events: none;
 }
+.af-card-preview iframe.is-ready { opacity: 1; }
 @supports not (zoom: 0.5) {
   .af-card-preview iframe {
     transform: scale(0.5);
     transform-origin: 0 0;
   }
 }
-.af-card-preview-loading,
-.af-card-preview-fallback {
+.af-card-preview-backing {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  z-index: 0;
 }
-.af-card-preview-loading { padding: 1rem; }
-.af-card-preview-loading .af-skeleton { width: 100%; height: 100%; border-radius: 0.625rem; }
-.af-card-preview-fallback { color: var(--accent); }
-.af-card-preview-fallback::before {
-  content: '';
-  position: absolute;
-  width: 5.5rem;
-  height: 5.5rem;
-  border-radius: 1.5rem;
-  background: var(--accent-dim);
-  transform: rotate(-5deg);
-}
-.af-card-preview-fallback svg { position: relative; z-index: 1; }
 .af-card-body {
   display: flex;
   align-items: center;
@@ -394,7 +385,8 @@ export const CSS = `
   overflow: hidden;
   background: var(--bg);
 }
-.af-preview-frame { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+.af-preview-frame { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); opacity: 0; }
+.af-preview-frame.is-ready { opacity: 1; }
 .af-preview-loading { position: absolute; inset: 0; }
 .af-source { flex: 1; min-height: 0; overflow: hidden; background: var(--bg); }
 .af-cm-host { width: 100%; height: 100%; min-height: 0; overflow: hidden; background: var(--bg); }

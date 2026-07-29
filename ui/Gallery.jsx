@@ -63,16 +63,13 @@ async function readFolder(storage, prefix) {
   return values.filter((value) => value && typeof value === 'object')
 }
 
-export function Gallery({ appId, storage, onOpen }) {
+export function Gallery({ appId, storage, onOpen, inactive = false }) {
   const [artifacts, setArtifacts] = useState([])
   const [shares, setShares] = useState(new Map())
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const loadId = useRef(0)
   const loading = useRef(false)
-  const scrolling = useRef(false)
-  const scrollTimer = useRef(null)
-  const [previewPaused, setPreviewPaused] = useState(false)
 
   const load = useCallback(async () => {
     if (loading.current) return
@@ -117,9 +114,10 @@ export function Gallery({ appId, storage, onOpen }) {
   const sharedCount = [...shares.values()].filter((share) => share?.published === true).length
 
   useEffect(() => {
+    if (inactive) return undefined
     load()
     const refreshVisible = () => {
-      if (document.visibilityState !== 'hidden' && !scrolling.current) load()
+      if (document.visibilityState !== 'hidden') load()
     }
     const onVisibility = () => {
       if (document.visibilityState === 'visible') load()
@@ -132,25 +130,15 @@ export function Gallery({ appId, storage, onOpen }) {
       window.clearInterval(timer)
       window.removeEventListener('focus', refreshVisible)
       document.removeEventListener('visibilitychange', onVisibility)
-      if (scrollTimer.current) window.clearTimeout(scrollTimer.current)
     }
-  }, [load])
-
-  const pausePreviewsWhileScrolling = () => {
-    if (!scrolling.current) {
-      scrolling.current = true
-      setPreviewPaused(true)
-    }
-    if (scrollTimer.current) window.clearTimeout(scrollTimer.current)
-    scrollTimer.current = window.setTimeout(() => {
-      scrolling.current = false
-      scrollTimer.current = null
-      setPreviewPaused(false)
-    }, 140)
-  }
+  }, [inactive, load])
 
   return (
-    <div className="af-view af-gallery">
+    <div
+      className="af-view af-gallery"
+      aria-hidden={inactive || undefined}
+      inert={inactive || undefined}
+    >
       <header className="af-header">
         <div className="af-brand">
           <span className="af-mark" aria-hidden="true">
@@ -158,12 +146,12 @@ export function Gallery({ appId, storage, onOpen }) {
           </span>
           <div className="af-brand-copy">
             <h1>Artifacts</h1>
-            <p>{status === 'loading' ? 'Loading your catalog…' : `${artifacts.length} ${artifacts.length === 1 ? 'artifact' : 'artifacts'} · ${versionCount} ${versionCount === 1 ? 'version' : 'versions'}${sharedCount ? ` · ${sharedCount} shared` : ''}`}</p>
+            <p aria-live="polite">{status === 'loading' ? 'Loading your catalog…' : `${artifacts.length} ${artifacts.length === 1 ? 'artifact' : 'artifacts'} · ${versionCount} ${versionCount === 1 ? 'version' : 'versions'}${sharedCount ? ` · ${sharedCount} shared` : ''}`}</p>
           </div>
         </div>
       </header>
 
-      <main className="af-scroll" id="af-main" onScroll={pausePreviewsWhileScrolling}>
+      <main className="af-scroll" id="af-main">
         <div className="af-page">
           <section className="af-skill-note" aria-label="About Artifacts">
             <img className="af-skill-note-icon" src={SKILLS_ICON} alt="" aria-hidden="true" />
@@ -172,11 +160,6 @@ export function Gallery({ appId, storage, onOpen }) {
               <span>Ask for a mockup, diagram, interactive explainer, or polished report in any chat; Möbius will keep it here with its versions and source conversation.</span>
             </div>
           </section>
-          {status === 'loading' && (
-            <div className="af-card-list" aria-label="Loading artifacts">
-              {[0, 1, 2].map((item) => <div className="af-card af-card-skeleton" key={item}><div className="af-card-preview"><div className="af-skeleton" /></div><div className="af-card-body"><div className="af-skeleton af-skeleton-icon" /><div className="af-skeleton-lines"><div className="af-skeleton" /><div className="af-skeleton is-short" /></div></div></div>)}
-            </div>
-          )}
           {status === 'error' && <LoadError message={error} onRetry={load} />}
           {status === 'ready' && artifacts.length === 0 && <Empty />}
           {status === 'ready' && artifacts.length > 0 && (
@@ -191,7 +174,6 @@ export function Gallery({ appId, storage, onOpen }) {
                         artifact={artifact}
                         shared={shares.get(artifact.id)?.published === true}
                         storage={storage}
-                        previewPaused={previewPaused}
                         onOpen={onOpen}
                       />
                     ))}

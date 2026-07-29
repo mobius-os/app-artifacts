@@ -109,6 +109,48 @@ test('gallery preview enrichment cannot make the artifact catalogue unavailable'
   assert.match(thumbnail, /\.catch\(\(\) => \{[\s\S]*status: 'fallback'/)
 })
 
+test('artifact previews keep their placeholder until the staged frame has painted', async () => {
+  const detailFrame = await readSource('preview/ArtifactFrame.jsx')
+  const thumbnail = await readSource('ui/ArtifactThumbnail.jsx')
+  const theme = await readSource('theme.js')
+
+  assert.match(detailFrame, /status: 'staged'/)
+  assert.match(detailFrame, /state\.status === 'loading' \|\| state\.status === 'staged'/)
+  assert.match(detailFrame, /onLoad=\{showPreview\}/)
+  assert.match(detailFrame, /state\.status === 'ready' \? ' is-ready' : ''/)
+
+  assert.match(thumbnail, /status: 'staged'/)
+  assert.match(thumbnail, /af-card-preview-backing/)
+  assert.match(thumbnail, /onLoad=\{\(\) => setState/)
+  assert.match(thumbnail, /state\.status === 'ready' \? 'is-ready' : ''/)
+
+  assert.match(theme, /\.af-card-preview iframe \{[\s\S]*opacity: 0;/)
+  assert.match(theme, /\.af-card-preview iframe\.is-ready \{ opacity: 1; \}/)
+  assert.match(theme, /\.af-preview-frame \{[\s\S]*opacity: 0;/)
+  assert.match(theme, /\.af-preview-frame\.is-ready \{ opacity: 1; \}/)
+})
+
+test('scrolling never blanks or pauses artifact preview frames', async () => {
+  const gallery = await readSource('ui/Gallery.jsx')
+  const card = await readSource('ui/ArtifactCard.jsx')
+  const thumbnail = await readSource('ui/ArtifactThumbnail.jsx')
+  const theme = await readSource('theme.js')
+
+  assert.doesNotMatch(gallery, /previewPaused|pausePreviewsWhileScrolling|onScroll=/)
+  assert.doesNotMatch(card, /previewPaused|paused=/)
+  assert.doesNotMatch(thumbnail, /\bpaused\b/)
+  assert.match(thumbnail, /rootMargin: '800px 0px'/)
+  assert.match(thumbnail, /af-card-preview-backing/)
+  assert.match(theme, /\.af-card-preview iframe \{[\s\S]*background: transparent;/)
+  assert.match(theme, /\.af-card-preview iframe \{[\s\S]*z-index: 1;/)
+  assert.match(theme, /\.af-card-preview-backing \{[\s\S]*z-index: 0;/)
+  assert.doesNotMatch(
+    theme.match(/\.af-card \{[\s\S]*?\n\}/)?.[0] || '',
+    /content-visibility|contain-intrinsic-size/,
+    'nested preview frames must remain painted when their card leaves the viewport',
+  )
+})
+
 test('chat deep links reuse the shell Back entry instead of adding a gallery stop', async () => {
   const source = await readSource('index.jsx')
   assert.match(source, /openDetail\(id, \{ ownBackEntry: false \}\)/)
@@ -116,6 +158,19 @@ test('chat deep links reuse the shell Back entry instead of adding a gallery sto
     source,
     /if \(!ownBackEntry\) \{[\s\S]*setSelectedId\(id\)[\s\S]*return[\s\S]*\}\n    if \(id === selectedId\) return/,
   )
+})
+
+test('detail navigation preserves the painted gallery instead of rebuilding it', async () => {
+  const source = await readSource('index.jsx')
+  const gallery = await readSource('ui/Gallery.jsx')
+  const theme = await readSource('theme.js')
+
+  assert.match(source, /<Gallery[\s\S]*inactive=\{Boolean\(selectedId\)\}[\s\S]*\/>[\s\S]*\{selectedId && \(/)
+  assert.match(gallery, /aria-hidden=\{inactive \|\| undefined\}/)
+  assert.match(gallery, /inert=\{inactive \|\| undefined\}/)
+  assert.match(gallery, /if \(inactive\) return undefined[\s\S]*load\(\)/)
+  assert.doesNotMatch(gallery, /aria-label="Loading artifacts"/)
+  assert.match(theme, /\.af-detail \{[\s\S]*position: absolute;[\s\S]*z-index: 2;/)
 })
 
 test('a recovered share is presented without inventing a version', async () => {
