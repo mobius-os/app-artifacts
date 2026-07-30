@@ -15,6 +15,7 @@ import {
   Reload,
   Share,
   Trash,
+  X,
 } from '@openai/apps-sdk-ui/components/Icon'
 
 function AppIcon({ icon: Icon, size = 20, ...props }) {
@@ -37,3 +38,4 @@ export const ReloadIcon = (props) => <AppIcon icon={Reload} {...props} />
 export const ShareIcon = (props) => <AppIcon icon={Share} {...props} />
 export const TrashIcon = (props) => <AppIcon icon={Trash} {...props} />
 export const CheckIcon = (props) => <AppIcon icon={Check} {...props} />
+export const CloseIcon = (props) => <AppIcon icon={X} {...props} />

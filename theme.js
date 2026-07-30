@@ -524,8 +524,19 @@ export const CSS = `
 .af-sheet-heading p,
 .af-sheet-copy { margin: 0.375rem 0 0; color: var(--muted); font-size: 0.875rem; line-height: 1.5; text-wrap: pretty; }
 .af-sheet-icon { width: 2.5rem; height: 2.5rem; border-radius: 0.6875rem; }
-.af-share-url { display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0 0.625rem; padding: 0.375rem 0.375rem 0.375rem 0.75rem; border: 1px solid var(--border); border-radius: 0.625rem; background: var(--surface2); }
+.af-share-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.af-share-heading p { margin: 0.375rem 0 0; color: var(--muted); font-size: 0.875rem; line-height: 1.5; text-wrap: pretty; }
+.af-share-close { flex: 0 0 auto; margin: -0.3125rem -0.375rem 0 0; }
+.af-share-preview { overflow: hidden; margin: 1rem 0 0; border: 1px solid var(--border); border-radius: 0.875rem; background: #201a3d; box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--text) 8%, transparent); }
+.af-share-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; object-fit: cover; }
+.af-share-preview figcaption { display: flex; align-items: center; justify-content: space-between; padding: 0.625rem 0.75rem; border-top: 1px solid color-mix(in srgb, #fff 14%, transparent); background: color-mix(in srgb, #16122b 94%, transparent); color: #d5cfe2; font-size: 0.75rem; }
+.af-share-preview figcaption strong { color: #fff; font-size: 0.6875rem; letter-spacing: 0.02em; }
+.af-share-url { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0 0; padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: 0.625rem; background: var(--surface2); }
 .af-share-url span { flex: 1; min-width: 0; overflow: hidden; color: var(--text); font: 500 0.75rem/1.4 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.af-share-primary { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.af-share-primary > .af-btn { flex: 1; }
+.af-share-maintenance { display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem; margin-top: 0.5rem; }
+.af-share-maintenance .af-btn { min-height: 2.25rem; padding-inline: 0.625rem; font-size: 0.75rem; }
 .af-sheet-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; }
 .af-sheet-actions > .af-btn { flex: 1; }
 .af-sheet-actions.is-stacked { flex-direction: column; }

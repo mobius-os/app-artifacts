@@ -67,7 +67,22 @@ test('storage bridge identifies only the mounted opaque preview frame', async ()
 test('published staging injects storage without changing immutable version HTML', async () => {
   const source = await readSource('ui/Detail.jsx')
   assert.match(source, /injectArtifactStorageShim\(html, \{ variant: 'published' \}\)/)
-  assert.match(source, /setText\(`projects\/\$\{record\.id\}\/build\/site\/index\.html`, publishedHtml\)/)
+  assert.match(source, /setText\(`\$\{root\}\/index\.html`, publishedHtml\)/)
+  assert.match(source, /setBlob\(`\$\{root\}\/\$\{ARTIFACT_PREVIEW_FILENAME\}`/)
+})
+
+test('every sharing-sheet icon used by a rendered branch remains imported', async () => {
+  const source = await readSource('ui/ShareSheet.jsx')
+  const imported = source.match(/import\s+\{([^}]+)\}\s+from '\.\/Icons\.jsx'/)
+  assert.ok(imported, 'the shared sheet icon import must remain explicit')
+  const importedNames = new Set(
+    imported[1].split(',').map((name) => name.trim()).filter(Boolean),
+  )
+  const used = [...source.matchAll(/<([A-Z][A-Za-z]+Icon)\b/g)]
+    .map((match) => match[1])
+  for (const icon of used) {
+    assert.ok(importedNames.has(icon), `${icon} is rendered but not imported`)
+  }
 })
 
 test('the in-flight storage cap is never reset on frame remount', async () => {
