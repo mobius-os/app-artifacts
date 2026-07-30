@@ -8,6 +8,12 @@ import {
   versionPath,
 } from '../domain.js'
 import { loadChatTitles } from '../storage.js'
+import {
+  ARTIFACT_PREVIEW_FILENAME,
+  artifactLinkPreviewMetadata,
+  injectLegacyArtifactLinkPreview,
+  renderArtifactLinkPreviewPng,
+} from '../linkPreview.js'
 import { ArtifactFrame } from '../preview/ArtifactFrame.jsx'
 import { SourceViewer } from './SourceViewer.jsx'
 import { VersionSheet } from './VersionTimeline.jsx'
@@ -187,9 +193,34 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
 
   async function stageVersion(version) {
     const html = await readVersionHtml(version)
-    await storage.removeFolder(`projects/${record.id}/build/site`)
+    const root = `projects/${record.id}/build/site`
+    const preview = await renderArtifactLinkPreviewPng(record, version)
+    await storage.removeFolder(root)
     const publishedHtml = injectArtifactStorageShim(html, { variant: 'published' })
-    await storage.setText(`projects/${record.id}/build/site/index.html`, publishedHtml)
+    const saved = await Promise.all([
+      storage.setText(`${root}/index.html`, publishedHtml),
+      storage.setBlob(`${root}/${ARTIFACT_PREVIEW_FILENAME}`, preview),
+    ])
+    if (saved.some((result) => result?.queued)) {
+      throw new Error('Connect to the internet before sharing this artifact.')
+    }
+  }
+
+  async function stageLegacyMetadata(version, publicUrl) {
+    const html = await readVersionHtml(version)
+    const publishedHtml = injectArtifactStorageShim(html, { variant: 'published' })
+    const withPreview = injectLegacyArtifactLinkPreview(
+      publishedHtml,
+      publicUrl,
+      artifactLinkPreviewMetadata(record, version),
+    )
+    const saved = await storage.setText(
+      `projects/${record.id}/build/site/index.html`,
+      withPreview,
+    )
+    if (saved?.queued) {
+      throw new Error('Connect to the internet before sharing this artifact.')
+    }
   }
 
   function reflectLocalShare(next) {
@@ -207,7 +238,15 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     const updating = Boolean(share?.published)
     try {
       await stageVersion(version)
-      const result = await storage.publish(record.id)
+      const metadata = artifactLinkPreviewMetadata(record, version)
+      let result = await storage.publish(record.id, metadata)
+      // Older Möbius releases do not yet add canonical metadata while making
+      // the snapshot. They ignore link_preview and return no public_url, so
+      // restage only the HTML once while keeping the same preview asset.
+      if (!result.public_url) {
+        await stageLegacyMetadata(version, toPublicUrl(result.url))
+        result = await storage.publish(record.id, metadata)
+      }
       // The snapshot is live now; that is the source of truth. Reflect it in
       // the UI immediately, then persist the share record BEST-EFFORT. If that
       // write fails, the platform already wrote a token hint into the project
@@ -215,7 +254,10 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       // to compensate, and the old rollback dance (which also mis-staged a
       // recovered share's null version) is gone.
       const next = publishedShare({
-        id: record.id, version, token: result.token, url: result.url,
+        id: record.id,
+        version,
+        token: result.token,
+        url: result.public_url || result.url,
       })
       reflectLocalShare(next)
       showToast(updating ? `Shared version updated to v${version}.` : 'Public link created.', 'success')

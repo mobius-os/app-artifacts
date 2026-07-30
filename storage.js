@@ -71,6 +71,17 @@ export function makeStorage(appId, token) {
     return { synced: true }
   }
 
+  async function setBlob(path, value) {
+    if (runtime?.setBlob) return runtime.setBlob(path, value)
+    const response = await fetch(`/api/storage/apps/${appId}/${path}`, {
+      method: 'PUT',
+      headers: { ...auth, 'Content-Type': value?.type || 'application/octet-stream' },
+      body: value,
+    })
+    if (!response.ok) throw await responseError(response, `Could not save ${path} (${response.status}).`)
+    return { synced: true }
+  }
+
   async function remove(path) {
     if (runtime?.remove) return runtime.remove(path)
     const response = await fetch(`/api/storage/apps/${appId}/${path}`, {
@@ -117,11 +128,14 @@ export function makeStorage(appId, token) {
     return { synced: true }
   }
 
-  async function publish(projectId) {
+  async function publish(projectId, linkPreview = null) {
     const response = await fetch(`/api/apps/${appId}/publish`, {
       method: 'POST',
       headers: { ...auth, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId }),
+      body: JSON.stringify({
+        project_id: projectId,
+        ...(linkPreview ? { link_preview: linkPreview } : {}),
+      }),
     })
     if (!response.ok) {
       throw await responseError(response, `Could not publish (${response.status}).`)
@@ -189,6 +203,7 @@ export function makeStorage(appId, token) {
     getText,
     setJSON,
     setText,
+    setBlob,
     remove,
     list,
     subscribe,

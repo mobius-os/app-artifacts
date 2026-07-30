@@ -1,5 +1,14 @@
-import React, { useEffect, useRef } from 'react'
-import { ArrowUpRightIcon, ChatIcon, CopyIcon, DownloadIcon, ShareIcon, TrashIcon } from './Icons.jsx'
+import React, { useEffect, useMemo, useRef } from 'react'
+import { artifactLinkPreviewDataUrl } from '../linkPreview.js'
+import {
+  ArrowUpRightIcon,
+  ChatIcon,
+  CloseIcon,
+  CopyIcon,
+  DownloadIcon,
+  ShareIcon,
+  TrashIcon,
+} from './Icons.jsx'
 
 function useSheetFocus(open, busy, onClose) {
   const sheetRef = useRef(null)
@@ -53,9 +62,16 @@ export function ShareSheet({
   onStop,
 }) {
   const sheetRef = useSheetFocus(open, busy, onClose)
-  if (!open) return null
   const current = Number(artifact?.current_version) || 1
   const shared = Boolean(share?.published)
+  const previewVersion = shared && !share?.recovered
+    ? Number(share?.shared_version) || current
+    : current
+  const previewUrl = useMemo(
+    () => artifactLinkPreviewDataUrl(artifact, previewVersion),
+    [artifact, previewVersion],
+  )
+  if (!open) return null
   return (
     <div className="af-scrim" role="presentation" onClick={busy ? undefined : onClose}>
       <section
@@ -67,8 +83,7 @@ export function ShareSheet({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="af-sheet-handle" aria-hidden="true" />
-        <div className="af-sheet-heading">
-          <span className="af-sheet-icon" aria-hidden="true"><ShareIcon size={21} /></span>
+        <div className="af-share-heading">
           <div>
             <h2 id="af-share-title">{shared ? 'Shared artifact' : 'Share this artifact'}</h2>
             <p>{shared
@@ -80,41 +95,61 @@ export function ShareSheet({
                 : `Public snapshot: version ${share.shared_version}`)
               : `Publish version ${current} as a public snapshot.`}</p>
           </div>
+          <button
+            className="af-btn af-btn-icon af-btn-ghost af-share-close"
+            type="button"
+            aria-label="Close sharing"
+            onClick={onClose}
+            disabled={busy}
+          >
+            <CloseIcon size={19} />
+          </button>
         </div>
+
+        <figure className="af-share-preview">
+          <img src={previewUrl} alt="" />
+          <figcaption>
+            <span>Link preview</span>
+            <strong>v{previewVersion}</strong>
+          </figcaption>
+        </figure>
 
         {shared && (
           <div className="af-share-url">
             <span>{share.url}</span>
-            <button className="af-btn af-btn-icon" type="button" aria-label="Copy public link" onClick={onCopy}>
-              <CopyIcon size={18} />
-            </button>
           </div>
         )}
 
-        {shared && share.url && (
-          <a className="af-btn af-btn-secondary af-btn-block" href={share.url} target="_blank" rel="noopener noreferrer">
-            Open public page <ArrowUpRightIcon size={17} />
-          </a>
-        )}
-
-        <div className="af-sheet-actions is-stacked">
+        <div className="af-share-primary">
           {!shared && (
             <button className="af-btn af-btn-primary af-btn-block" type="button" onClick={() => onPublish(current)} disabled={busy}>
               {busy ? 'Publishing…' : `Share version ${current}`}
             </button>
           )}
-          {shared && needsUpdate && (
-            <button className="af-btn af-btn-primary af-btn-block" type="button" onClick={() => onPublish(current)} disabled={busy}>
-              {busy ? 'Updating…' : `Update shared version to v${current}`}
+          {shared && (
+            <button className="af-btn af-btn-primary" type="button" onClick={onCopy} disabled={busy}>
+              <CopyIcon size={17} /> Copy link
             </button>
           )}
-          {shared && (
-            <button className="af-btn af-btn-danger-ghost af-btn-block" type="button" onClick={onStop} disabled={busy}>
+          {shared && share.url && (
+            <a className="af-btn af-btn-secondary" href={share.url} target="_blank" rel="noopener noreferrer">
+              Open <ArrowUpRightIcon size={17} />
+            </a>
+          )}
+        </div>
+
+        {shared && (
+          <div className="af-share-maintenance">
+            {needsUpdate && (
+              <button className="af-btn af-btn-ghost" type="button" onClick={() => onPublish(current)} disabled={busy}>
+                {busy ? 'Updating…' : `Update to v${current}`}
+              </button>
+            )}
+            <button className="af-btn af-btn-danger-ghost" type="button" onClick={onStop} disabled={busy}>
               {busy ? 'Stopping…' : 'Stop sharing'}
             </button>
-          )}
-          <button className="af-btn af-btn-ghost af-btn-block" type="button" onClick={onClose} disabled={busy}>Done</button>
-        </div>
+          </div>
+        )}
       </section>
     </div>
   )

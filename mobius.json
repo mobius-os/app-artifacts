@@ -1,7 +1,7 @@
 {
   "id": "artifacts",
   "name": "Artifacts",
-  "version": "0.5.11",
+  "version": "0.6.0",
   "description": "Browse, preview, version, share, view, copy, and download interactive pages and polished documents created in Möbius chats.",
   "author": "mobius-os",
   "license": "MIT",
@@ -20,6 +20,7 @@
     "artifacts-core.md",
     "artifacts.md",
     "domain.js",
+    "linkPreview.js",
     "source-syntax.js",
     "storage.js",
     "theme.js",
