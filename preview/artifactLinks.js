@@ -1,11 +1,4 @@
-function injectScriptAfterDoctype(html, source) {
-  const script = `<script>${source.replace(/<\/script/gi, '<\\/script')}</script>`
-  const document = String(html ?? '')
-  const doctype = /^((?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>)/i.exec(document)
-  return doctype
-    ? `${doctype[1]}${script}${document.slice(doctype[1].length)}`
-    : `${script}${document}`
-}
+import { injectArtifactScript } from '../domain.js'
 
 /**
  * Keep links inside an opaque srcDoc preview from navigating the nested frame.
@@ -39,5 +32,5 @@ var rel=tokens(anchor.getAttribute('rel'));if(rel.indexOf('noopener')<0)rel.push
 }
 
 export function injectArtifactPreviewLinkShim(html) {
-  return injectScriptAfterDoctype(html, artifactPreviewLinkShimSource())
+  return injectArtifactScript(html, artifactPreviewLinkShimSource())
 }

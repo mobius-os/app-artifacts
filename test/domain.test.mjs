@@ -6,6 +6,7 @@ import {
   artifactIntent,
   createArtifactId,
   friendlyLoadError,
+  injectArtifactScript,
   injectArtifactStorageShim,
   isValidArtifactStorageKey,
   isValidProjectId,
@@ -182,6 +183,17 @@ test('artifact storage injection preserves a leading doctype', () => {
   const injected = injectArtifactStorageShim(original, { variant: 'published' })
   assert.match(injected, /^<!-- built artifact --><!doctype html><script>/i)
   assert.match(injected, /<html><body>Hi<\/body><\/html>$/)
+})
+
+test('artifact script injection has one doctype-preserving safe boundary', () => {
+  const injected = injectArtifactScript(
+    '<!doctype html><main>Artifact</main>',
+    'window.example = "</script><p>not markup</p>"',
+  )
+  assert.match(injected, /^<!doctype html><script>/i)
+  assert.match(injected, /<\\\/script><p>not markup<\/p>/)
+  assert.equal((injected.match(/<script>/g) || []).length, 1)
+  assert.match(injected, /<main>Artifact<\/main>$/)
 })
 
 test('a frame that navigated away loses storage authority', () => {
