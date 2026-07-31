@@ -206,14 +206,18 @@ var root=w.mobiusArtifact&&typeof w.mobiusArtifact==='object'?w.mobiusArtifact:{
 })();`
 }
 
-export function injectArtifactStorageShim(html, options) {
-  const source = artifactStorageShimSource(options).replace(/<\/script/gi, '<\\/script')
-  const script = `<script>${source}</script>`
+export function injectArtifactScript(html, source) {
+  const safeSource = String(source ?? '').replace(/<\/script/gi, '<\\/script')
+  const script = `<script>${safeSource}</script>`
   const document = String(html ?? '')
   const doctype = /^((?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>)/i.exec(document)
   return doctype
     ? `${doctype[1]}${script}${document.slice(doctype[1].length)}`
     : `${script}${document}`
+}
+
+export function injectArtifactStorageShim(html, options) {
+  return injectArtifactScript(html, artifactStorageShimSource(options))
 }
 
 export function makeArtifactRecord({
