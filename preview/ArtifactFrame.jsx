@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ReloadIcon } from '../ui/Icons.jsx'
 import { injectArtifactStorageShim, versionPath } from '../domain.js'
+import { injectArtifactPreviewLinkShim } from './artifactLinks.js'
 
 export function ArtifactFrame({
   artifactId,
@@ -45,9 +46,11 @@ export function ArtifactFrame({
     }
     const sessionKey = Array.from(bytes, (n) => n.toString(36)).join('-')
     return {
-      html: injectArtifactStorageShim(state.html, {
-        variant: 'preview', writable, sessionKey,
-      }),
+      html: injectArtifactPreviewLinkShim(
+        injectArtifactStorageShim(state.html, {
+          variant: 'preview', writable, sessionKey,
+        }),
+      ),
       sessionKey,
     }
   }, [state.html, writable])
