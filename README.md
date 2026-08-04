@@ -40,7 +40,7 @@ Run the unit tests:
 npm test
 ```
 
-The platform bundles `index.jsx` with esbuild as one ESM module and supplies React and `date-fns` through the Möbius import map.
+The platform bundles `index.jsx` with Rolldown as one ESM module and supplies React and `date-fns` through the Möbius import map.
 
 ## License
 
