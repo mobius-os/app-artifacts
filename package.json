@@ -4,9 +4,6 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "smoke": "esbuild index.jsx --bundle --packages=external --format=esm --loader:.js=jsx --outfile=/dev/null"
-  },
-  "devDependencies": {
-    "esbuild": "0.25.12"
+    "smoke": "node scripts/compile-smoke.mjs"
   }
 }
