@@ -65,6 +65,7 @@ async function readFolder(storage, prefix) {
 
 export function Gallery({ appId, storage, onOpen, inactive = false }) {
   const [artifacts, setArtifacts] = useState([])
+  const [iconOk, setIconOk] = useState(true)
   const [shares, setShares] = useState(new Map())
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
@@ -142,7 +143,9 @@ export function Gallery({ appId, storage, onOpen, inactive = false }) {
       <header className="af-header">
         <div className="af-brand">
           <span className="af-mark" aria-hidden="true">
-            <img src={`/api/apps/${appId}/icon?size=64`} alt="" />
+            {iconOk
+              ? <img src={`/api/apps/${appId}/icon?size=64`} alt="" onError={() => setIconOk(false)} />
+              : <span className="af-mark-fallback">A</span>}
           </span>
           <div className="af-brand-copy">
             <h1>Artifacts</h1>

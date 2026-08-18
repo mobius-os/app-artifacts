@@ -80,6 +80,8 @@ export const CSS = `
 }
 .af-mark { width: 2.75rem; height: 2.75rem; background: transparent; }
 .af-mark img { width: 100%; height: 100%; object-fit: contain; }
+.af-mark-fallback { width: 2.125rem; height: 2.125rem; display: grid; place-items: center; border-radius: 0.5rem;
+  background: var(--accent-dim); color: var(--accent); font-size: 0.875rem; font-weight: 750; }
 .af-brand-copy { min-width: 0; }
 .af-brand-copy h1,
 .af-detail-heading h1,
