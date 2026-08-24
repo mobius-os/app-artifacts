@@ -62,7 +62,7 @@ export const CSS = `
   align-items: center;
   min-height: 4rem;
   padding: max(0.625rem, env(safe-area-inset-top)) 1rem 0.625rem;
-  background: var(--surface);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 .af-header { justify-content: space-between; }
@@ -622,4 +622,22 @@ export const CSS = `
   }
 }
 /* /mobius-ui:ReducedMotion */
+
+/* mobius-ui:CenteredRail v1 */
+@media (min-width: 900px) {
+  .af-root {
+    background:
+      linear-gradient(var(--bg), var(--bg)) center / min(100%, 74rem) 100% no-repeat,
+      radial-gradient(ellipse 76% 112% at 50% 46%,
+        color-mix(in srgb, var(--accent) 18%, var(--bg)) 0%,
+        color-mix(in srgb, var(--accent) 7%, var(--bg)) 46%,
+        color-mix(in srgb, var(--text) 2%, var(--bg)) 100%);
+
+  }
+  .af-header, .af-detail-header { width: min(100%, 74rem); margin-inline: auto; }
+  .af-view { background: transparent; }
+  .af-header { width: min(100%, 74rem); }
+  .af-detail-header { width: min(100%, 62rem); }
+}
+/* /mobius-ui:CenteredRail */
 `
