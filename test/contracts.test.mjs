@@ -50,6 +50,12 @@ test('artifact detail is the single full-height preview surface', async () => {
   assert.doesNotMatch(theme, /\.af-preview-shell\.is-fullscreen/)
 })
 
+test('artifact detail chrome uses the same wide, left-led composition as map detail', async () => {
+  const theme = await readSource('theme.js')
+  assert.match(theme, /\.af-detail-heading\s*\{[\s\S]*?text-align:\s*left;/)
+  assert.match(theme, /\.af-detail-header\s*\{ width:\s*min\(100%,\s*74rem\); \}/)
+})
+
 test('manifest keeps the Artifacts system prompt wiring', async () => {
   const manifest = JSON.parse(await readSource('mobius.json'))
   assert.equal(manifest.system_app, true)

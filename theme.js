@@ -102,7 +102,7 @@ export const CSS = `
   border-radius: 0.5rem;
   background: transparent;
   color: inherit;
-  text-align: center;
+  text-align: left;
   font-family: var(--font);
   cursor: pointer;
   touch-action: manipulation;
@@ -626,18 +626,12 @@ export const CSS = `
 /* mobius-ui:CenteredRail v1 */
 @media (min-width: 900px) {
   .af-root {
-    background:
-      linear-gradient(var(--bg), var(--bg)) center / min(100%, 74rem) 100% no-repeat,
-      radial-gradient(ellipse 76% 112% at 50% 46%,
-        color-mix(in srgb, var(--accent) 18%, var(--bg)) 0%,
-        color-mix(in srgb, var(--accent) 7%, var(--bg)) 46%,
-        color-mix(in srgb, var(--text) 2%, var(--bg)) 100%);
 
   }
   .af-header, .af-detail-header { width: min(100%, 74rem); margin-inline: auto; }
   .af-view { background: transparent; }
   .af-header { width: min(100%, 74rem); }
-  .af-detail-header { width: min(100%, 62rem); }
+  .af-detail-header { width: min(100%, 74rem); }
 }
 /* /mobius-ui:CenteredRail */
 `
