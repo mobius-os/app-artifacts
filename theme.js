@@ -62,7 +62,7 @@ export const CSS = `
   align-items: center;
   min-height: 4rem;
   padding: max(0.625rem, env(safe-area-inset-top)) 1rem 0.625rem;
-  background: var(--surface);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 .af-header { justify-content: space-between; }
@@ -102,7 +102,7 @@ export const CSS = `
   border-radius: 0.5rem;
   background: transparent;
   color: inherit;
-  text-align: center;
+  text-align: left;
   font-family: var(--font);
   cursor: pointer;
   touch-action: manipulation;
@@ -622,4 +622,16 @@ export const CSS = `
   }
 }
 /* /mobius-ui:ReducedMotion */
+
+/* mobius-ui:CenteredRail v1 */
+@media (min-width: 900px) {
+  .af-root {
+
+  }
+  .af-header, .af-detail-header { width: min(100%, 74rem); margin-inline: auto; }
+  .af-view { background: transparent; }
+  .af-header { width: min(100%, 74rem); }
+  .af-detail-header { width: min(100%, 74rem); }
+}
+/* /mobius-ui:CenteredRail */
 `
