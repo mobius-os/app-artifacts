@@ -63,8 +63,16 @@ export const CSS = `
   min-height: 4rem;
   padding: max(0.625rem, env(safe-area-inset-top)) 1rem 0.625rem;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  position: relative;
 }
+.af-header::after,
+.af-detail-header::after {
+  content: ''; position: absolute; left: 50%; bottom: 0;
+  transform: translateX(-50%); border-bottom: 1px solid var(--border);
+  pointer-events: none;
+}
+.af-header::after { width: min(74rem, calc(100% - 2rem)); }
+.af-detail-header::after { width: min(62rem, calc(100% - 2rem)); }
 .af-header { justify-content: space-between; }
 .af-brand { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
 .af-mark,
