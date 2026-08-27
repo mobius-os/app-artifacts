@@ -4,6 +4,7 @@ const PROJECT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 const ARTIFACT_STORAGE_KEY_RE = /^[a-z0-9._-]{1,64}$/
 const ARTIFACT_STORAGE_MESSAGE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const ARTIFACT_STORAGE_OPS = new Set(['get', 'set', 'remove', 'list'])
+const APP_SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
 
 export const ARTIFACT_STORAGE_INDEX_KEY = '__mobius_keys'
 export const ARTIFACT_STORAGE_MAX_VALUE_BYTES = 64 * 1024
@@ -78,6 +79,28 @@ export function createArtifactId(title, suffixOrRandom = Math.random) {
 
 export function isValidProjectId(value) {
   return typeof value === 'string' && PROJECT_ID_RE.test(value)
+}
+
+export function normalizeRelatedApps(apps) {
+  const normalized = []
+  const seen = new Set()
+  for (const app of Array.isArray(apps) ? apps : []) {
+    if (!app || typeof app !== 'object' || Array.isArray(app)) continue
+    const id = Number(app.id ?? app.app_id)
+    const slug = String(app.slug || '').trim()
+    const validId = Number.isInteger(id) && id > 0
+    const validSlug = APP_SLUG_RE.test(slug)
+    if (!validId && !validSlug) continue
+    const key = validSlug ? `slug:${slug}` : `id:${id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    normalized.push({
+      ...(validId ? { id } : {}),
+      ...(validSlug ? { slug } : {}),
+      ...(String(app.name || '').trim() ? { name: String(app.name).trim() } : {}),
+    })
+  }
+  return normalized
 }
 
 export function isValidArtifactStorageKey(value) {
@@ -228,9 +251,11 @@ export function makeArtifactRecord({
   createdAt,
   note = 'first version',
   bytes = 0,
+  relatedApps = [],
 }) {
   if (!isValidProjectId(id)) throw new Error('Artifact id must be a valid publish project_id.')
   const when = new Date(createdAt ?? Date.now()).toISOString()
+  const related = normalizeRelatedApps(relatedApps)
   return {
     id,
     title: String(title || 'Untitled artifact'),
@@ -246,6 +271,7 @@ export function makeArtifactRecord({
       note: String(note || 'first version'),
       bytes: Math.max(0, Number(bytes) || 0),
     }],
+    ...(related.length > 0 ? { related_apps: related } : {}),
   }
 }
 

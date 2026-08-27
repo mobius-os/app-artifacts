@@ -103,6 +103,21 @@ artifacts/<artifact_id>.json      # the record — metadata + version index
 versions/<artifact_id>/v<N>.html  # one immutable file per version
 ```
 
+An artifact can also carry an optional `related_apps` array when it is
+specifically about an existing Möbius app — for example, a redesign mockup,
+flow diagram, or report for that app. Each entry uses the app row's real
+identity: `{"id": 39, "slug": "app-store", "name": "App Store"}`. This is
+separate from `chat_id` provenance: the artifact remains linked to the chat
+that created each version, while also appearing among the work in the related
+app's current maintaining chat.
+
+Use `related_apps` only for an explicit relationship you can establish from
+the current linked-app context or the live apps list. Include `id`, `slug`, and
+`name` when available; the stable slug lets the relationship survive a
+different local install id. Never infer a relationship from a similar title.
+When iterating an artifact, preserve its existing relationships rather than
+replacing them with whatever apps happen to be linked to the current chat.
+
 **Never touch `shares/` or `projects/`** — those are the app's own bookkeeping
 for public sharing. Sharing is the partner's action, taken in the app.
 
@@ -126,6 +141,9 @@ D="/data/apps/$ARTIFACTS_APP_ID"
 NOW=$(date -u +%FT%TZ)
 TITLE="Tip Calculator"
 DESC="Split a bill and compute per-person tips."
+# If this artifact is explicitly about an existing app, copy its real identity
+# from linked-app context; otherwise keep this as an empty JSON array.
+RELATED_APPS_JSON='[]'
 
 mkdir -p "$D/versions/$AID" "$D/artifacts"
 # exclusive create — noclobber makes `>` fail instead of overwriting; a
@@ -135,14 +153,17 @@ if ! (set -o noclobber; cat page.html > "$D/versions/$AID/v1.html") 2>/dev/null;
 fi
 
 python3 - "$D/artifacts/$AID.json" "$AID" "$TITLE" "$DESC" "$CHAT_ID" "$NOW" \
-         "$D/versions/$AID/v1.html" <<'PY'
+         "$D/versions/$AID/v1.html" "$RELATED_APPS_JSON" <<'PY'
 import json, os, sys
-path, aid, title, desc, chat, now, blob = sys.argv[1:8]
+path, aid, title, desc, chat, now, blob, related_json = sys.argv[1:9]
+related = json.loads(related_json)
 rec = {"id": aid, "title": title, "description": desc,
        "chat_id": chat,                      # provenance — the app links back here
        "created_at": now, "updated_at": now, "current_version": 1,
        "versions": [{"v": 1, "created_at": now, "chat_id": chat,
                      "note": "first version", "bytes": os.path.getsize(blob)}]}
+if related:
+    rec["related_apps"] = related             # semantic target — its app chat also shows it
 tmp = f"{path}.{os.getpid()}.tmp"            # unique temp — concurrent writers don't collide
 with open(tmp, "w") as f: json.dump(rec, f)
 os.replace(tmp, path)                        # atomic swap — no torn reads
