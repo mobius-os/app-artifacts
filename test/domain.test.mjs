@@ -12,7 +12,6 @@ import {
   isValidProjectId,
   jsonValueBytes,
   makeArtifactRecord,
-  normalizeRelatedApps,
   nextVersion,
   planArtifactStorageRequest,
   isTrustedArtifactStorageMessage,
@@ -89,27 +88,25 @@ test('makeArtifactRecord starts at version one with origin provenance', () => {
   assert.equal(record.versions[0].bytes, 8123)
 })
 
-test('artifact records retain explicit app relationships without guessed metadata', () => {
-  const relatedApps = normalizeRelatedApps([
-    { app_id: 39, slug: 'app-store', name: ' App Store ' },
-    { id: 104, slug: 'app-store', name: 'Duplicate install' },
-    { id: 7, name: 'Local app' },
-    { slug: '../not-an-app' },
-    'app-store',
-  ])
-  assert.deepEqual(relatedApps, [
-    { id: 39, slug: 'app-store', name: 'App Store' },
-    { id: 7, name: 'Local app' },
-  ])
-
+test('artifact records keep one normalized identity for each related app', () => {
   const record = makeArtifactRecord({
     id: 'store-concepts-a690',
     title: 'Store concepts',
     chatId: 'origin-chat',
     createdAt: '2026-08-23T14:08:00.000Z',
-    relatedApps,
+    relatedApps: [
+      { app_id: 39, slug: 'app-store', name: ' App Store ' },
+      { id: 104, slug: 'app-store', name: 'Duplicate slug' },
+      { id: 39, slug: 'renamed-store', name: 'Duplicate id' },
+      { id: 7, name: 'Local app' },
+      { slug: '../not-an-app' },
+      'app-store',
+    ],
   })
-  assert.deepEqual(record.related_apps, relatedApps)
+  assert.deepEqual(record.related_apps, [
+    { id: 39, slug: 'app-store', name: 'App Store' },
+    { id: 7, name: 'Local app' },
+  ])
 })
 
 test('nextVersion and appendVersion bump from the highest recorded version without mutation', () => {

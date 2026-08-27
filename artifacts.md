@@ -113,8 +113,9 @@ app's current maintaining chat.
 
 Use `related_apps` only for an explicit relationship you can establish from
 the current linked-app context or the live apps list. Include `id`, `slug`, and
-`name` when available; the stable slug lets the relationship survive a
-different local install id. Never infer a relationship from a similar title.
+`name` when available. The slug is the durable identity across installations;
+the numeric id is only a fallback for older slug-less relationships. Never
+infer a relationship from a similar title.
 When iterating an artifact, preserve its existing relationships rather than
 replacing them with whatever apps happen to be linked to the current chat.
 

@@ -81,9 +81,10 @@ export function isValidProjectId(value) {
   return typeof value === 'string' && PROJECT_ID_RE.test(value)
 }
 
-export function normalizeRelatedApps(apps) {
+function normalizeRelatedApps(apps) {
   const normalized = []
-  const seen = new Set()
+  const seenIds = new Set()
+  const seenSlugs = new Set()
   for (const app of Array.isArray(apps) ? apps : []) {
     if (!app || typeof app !== 'object' || Array.isArray(app)) continue
     const id = Number(app.id ?? app.app_id)
@@ -91,9 +92,9 @@ export function normalizeRelatedApps(apps) {
     const validId = Number.isInteger(id) && id > 0
     const validSlug = APP_SLUG_RE.test(slug)
     if (!validId && !validSlug) continue
-    const key = validSlug ? `slug:${slug}` : `id:${id}`
-    if (seen.has(key)) continue
-    seen.add(key)
+    if ((validId && seenIds.has(id)) || (validSlug && seenSlugs.has(slug))) continue
+    if (validId) seenIds.add(id)
+    if (validSlug) seenSlugs.add(slug)
     normalized.push({
       ...(validId ? { id } : {}),
       ...(validSlug ? { slug } : {}),
