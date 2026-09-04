@@ -150,12 +150,18 @@ test('published shim derives its token from the path and is stably read-only', a
         // is no client index to read. It can still surface a retired
         // __mobius_keys file left by an older app version, plus (defensively) a
         // malformed name — both must be filtered out of list().
-        if (url === `/api/published-sites/${token}/data`) {
+        if (url === '/api/public-storage?prefix=') {
           return {
             ok: true,
             status: 200,
             json: async () => ({
-              keys: ['zeta', '__mobius_keys', '../escape', 'alpha', 'alpha'],
+              entries: [
+                { type: 'file', name: 'zeta.json' },
+                { type: 'file', name: '__mobius_keys.json' },
+                { type: 'file', name: '../escape.json' },
+                { type: 'file', name: 'alpha.json' },
+                { type: 'file', name: 'alpha.json' },
+              ],
             }),
           }
         }
@@ -167,9 +173,10 @@ test('published shim derives its token from the path and is stably read-only', a
   assert.equal(shim.storage.writable, false)
   assert.deepEqual(await shim.storage.get('dashboard'), { count: 3 })
   assert.deepEqual([...await shim.storage.list()], ['alpha', 'zeta'])
-  assert.equal(requests[0].url, `/api/published-sites/${token}/data/dashboard`)
+  assert.equal(requests[0].url, '/api/public-storage/dashboard.json')
   assert.equal(requests[0].options.cache, 'no-store')
   assert.equal(requests[0].options.credentials, 'omit')
+  assert.equal(requests[0].options.headers.Authorization, `Bearer ${token}`)
 
   const requestCount = requests.length
   await assert.rejects(shim.storage.set('dashboard', {}), (error) => (

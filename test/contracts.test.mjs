@@ -220,15 +220,16 @@ test('the app maintains no client-side key index', async () => {
     /artifactDataRemove\(plan\.artifactId,\s*ARTIFACT_STORAGE_INDEX_KEY\)/,
     'remove() must not rewrite a key index',
   )
-  // list() goes to the server-derived collection.
+  // list() goes to the ordinary app-storage directory listing.
   assert.match(source, /storage\.artifactDataKeys\(artifactId\)/)
 
   const storage = await readSource('storage.js')
   assert.match(
     storage,
-    /\/api\/apps\/\$\{appId\}\/artifact-data\/\$\{encodeURIComponent\(artifactId\)\}/,
-    'the collection read must target the artifact-data collection route',
+    /list\(`artifact-data\/\$\{artifactId\}`\)/,
+    'artifact keys must use the ordinary app-storage directory listing',
   )
+  assert.doesNotMatch(storage, /\/artifact-data\//, 'no Pages-only storage API remains')
 })
 
 test('the share flow reflects live state before persisting the record', async () => {

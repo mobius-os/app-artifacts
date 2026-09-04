@@ -36,7 +36,7 @@ function toPublicUrl(value) {
   try { return new URL(value, window.location.origin).href } catch { return String(value || '') }
 }
 
-const TOO_LARGE_MESSAGE = 'This artifact is too large to share — ask the agent to trim it.'
+const TOO_LARGE_MESSAGE = 'This page is too large to share — ask the agent to trim it.'
 
 function isPayloadTooLarge(error) {
   return Number(error?.status || error?.response?.status) === 413
@@ -114,7 +114,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       onRecord: acceptRecord,
       onRecordError: (error) => {
         setStatus('error')
-        showToast(error?.message || 'Artifact could not be loaded.', 'error')
+        showToast(error?.message || 'Page could not be loaded.', 'error')
       },
       onShare: acceptShare,
       onRecoveredShare: (recovered) => {
@@ -265,7 +265,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
         await storage.setJSON(`shares/${record.id}.json`, next)
       } catch { /* live + recoverable from the token hint; nothing to undo */ }
     } catch (error) {
-      showToast(shareFailureMessage(error, 'Artifact could not be shared.'), 'error')
+      showToast(shareFailureMessage(error, 'Page could not be shared.'), 'error')
     } finally {
       setBusy('')
     }
@@ -367,7 +367,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       await storage.remove(`artifacts/${record.id}.json`)
       onDeleted(record.id)
     } catch (error) {
-      showToast(error?.message || 'Artifact could not be deleted.', 'error')
+      showToast(error?.message || 'Page could not be deleted.', 'error')
       setBusy('')
     }
   }
@@ -392,8 +392,8 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
   if (status === 'missing' || status === 'error' || !record) {
     return (
       <div className="af-view">
-        <header className="af-detail-header"><button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={onClose} aria-label="Back to artifacts"><ArrowLeftIcon /></button><h1>Artifact unavailable</h1></header>
-        <div className="af-empty"><div className="af-empty-mark is-error">!</div><h2 className="af-empty-title">This artifact could not be found</h2><p className="af-empty-text">It may have been deleted while the catalog was open.</p><button className="af-btn af-btn-secondary" type="button" onClick={onClose}>Back to artifacts</button></div>
+        <header className="af-detail-header"><button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={onClose} aria-label="Back to pages"><ArrowLeftIcon /></button><h1>Page unavailable</h1></header>
+        <div className="af-empty"><div className="af-empty-mark is-error">!</div><h2 className="af-empty-title">This page could not be found</h2><p className="af-empty-text">It may have been deleted while the catalog was open.</p><button className="af-btn af-btn-secondary" type="button" onClick={onClose}>Back to pages</button></div>
       </div>
     )
   }
@@ -411,16 +411,16 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
   return (
     <div className="af-view af-detail">
       <header className="af-detail-header">
-        <button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={onClose} aria-label="Back to artifacts"><ArrowLeftIcon /></button>
-        <button className="af-detail-heading" type="button" onClick={() => setVersionsOpen(true)} aria-label={`Choose artifact version, currently ${previewVersion}`}>
-          <h1>{record.title || 'Untitled artifact'}</h1>
+        <button className="af-btn af-btn-icon af-btn-ghost" type="button" onClick={onClose} aria-label="Back to pages"><ArrowLeftIcon /></button>
+        <button className="af-detail-heading" type="button" onClick={() => setVersionsOpen(true)} aria-label={`Choose page version, currently ${previewVersion}`}>
+          <h1>{record.title || 'Untitled page'}</h1>
           <span>{previewVersion === currentVersion ? `v${currentVersion}` : `Viewing v${previewVersion}`}</span>
         </button>
-        <div className="af-view-toggle" role="group" aria-label="Artifact view">
+        <div className="af-view-toggle" role="group" aria-label="Page view">
           <button className={viewMode === 'preview' ? 'is-active' : ''} type="button" aria-pressed={viewMode === 'preview'} aria-label="Preview" title="Preview" onClick={() => setViewMode('preview')}><EyeIcon size={20} /></button>
           <button className={viewMode === 'source' ? 'is-active' : ''} type="button" aria-pressed={viewMode === 'source'} aria-label="Source" title="Source" onClick={() => setViewMode('source')}><CodeIcon size={20} /></button>
         </div>
-        <button className={`af-btn af-btn-icon af-btn-ghost af-header-action${needsUpdate ? ' has-update' : ''}`} type="button" onClick={() => setOptionsOpen(true)} aria-label="Artifact options"><MoreIcon /></button>
+        <button className={`af-btn af-btn-icon af-btn-ghost af-header-action${needsUpdate ? ' has-update' : ''}`} type="button" onClick={() => setOptionsOpen(true)} aria-label="Page options"><MoreIcon /></button>
       </header>
 
       <main className="af-artifact-stage">
@@ -437,7 +437,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
           : (
             <div className="af-source" aria-label={`HTML source, version ${previewVersion}`}>
               {(sourceState.key !== sourceKey || sourceState.status === 'loading') && (
-                <div className="af-source-state" aria-label="Loading artifact source"><div className="af-skeleton af-skeleton-window" /></div>
+                <div className="af-source-state" aria-label="Loading page source"><div className="af-skeleton af-skeleton-window" /></div>
               )}
               {sourceState.key === sourceKey && sourceState.status === 'error' && (
                 <div className="af-preview-error" role="status">
