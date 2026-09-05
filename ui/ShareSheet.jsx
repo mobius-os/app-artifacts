@@ -85,13 +85,13 @@ export function ShareSheet({
         <div className="af-sheet-handle" aria-hidden="true" />
         <div className="af-share-heading">
           <div>
-            <h2 id="af-share-title">{shared ? 'Shared artifact' : 'Share this artifact'}</h2>
+            <h2 id="af-share-title">{shared ? 'Shared page' : 'Share this page'}</h2>
             <p>{shared
               ? (share.recovered
                 // Recovered from the platform's token hint after the share
                 // record was lost — the version only ever lived in that record,
                 // so claim nothing about it.
-                ? 'This artifact has a public link, but its saved share details were lost. Stop sharing to take it down.'
+                ? 'This page has a public link, but its saved share details were lost. Stop sharing to take it down.'
                 : `Public snapshot: version ${share.shared_version}`)
               : `Publish version ${current} as a public snapshot.`}</p>
           </div>
@@ -183,7 +183,7 @@ export function ArtifactOptionsSheet({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="af-sheet-handle" aria-hidden="true" />
-        <h2 id="af-options-title">Artifact options</h2>
+        <h2 id="af-options-title">Page options</h2>
         {description && <p className="af-sheet-copy af-options-description">{description}</p>}
         <div className="af-option-list">
           <button className="af-option" type="button" onClick={onShare} disabled={busy}>
@@ -229,12 +229,12 @@ export function DeleteSheet({ open, title, busy, onClose, onDelete }) {
         onClick={(event) => event.stopPropagation()}
       >
         <div className="af-sheet-handle" aria-hidden="true" />
-        <h2 id="af-delete-title">Delete “{title || 'Untitled artifact'}”?</h2>
+        <h2 id="af-delete-title">Delete “{title || 'Untitled page'}”?</h2>
         <p className="af-sheet-copy">This removes every version and stops public sharing. This action cannot be undone.</p>
         <div className="af-sheet-actions">
           <button className="af-btn af-btn-secondary" type="button" onClick={onClose} disabled={busy}>Cancel</button>
           <button className="af-btn af-btn-danger" type="button" onClick={onDelete} disabled={busy}>
-            {busy ? 'Deleting…' : 'Delete artifact'}
+            {busy ? 'Deleting…' : 'Delete page'}
           </button>
         </div>
       </section>

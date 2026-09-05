@@ -22,8 +22,8 @@ export function makeStorage(appId, token) {
   const runtime = (typeof window !== 'undefined' && window.mobius?.storage) || null
   const auth = { Authorization: `Bearer ${token}` }
 
-  function artifactDataUrl(artifactId, key) {
-    return `/api/apps/${encodeURIComponent(appId)}/artifact-data/${encodeURIComponent(artifactId)}/${encodeURIComponent(key)}`
+  function artifactDataPath(artifactId, key) {
+    return `artifact-data/${artifactId}/${key}.json`
   }
 
   async function get(path) {
@@ -154,47 +154,25 @@ export function makeStorage(appId, token) {
   }
 
   async function artifactDataGet(artifactId, key) {
-    const response = await fetch(artifactDataUrl(artifactId, key), { headers: auth })
-    if (response.status === 404) return null
-    if (!response.ok) {
-      throw await responseError(response, `Could not read artifact data (${response.status}).`)
-    }
-    return response.json()
+    return get(artifactDataPath(artifactId, key))
   }
 
   async function artifactDataKeys(artifactId) {
-    // Server-derived from the directory: no client index to keep in sync.
-    const response = await fetch(
-      `/api/apps/${appId}/artifact-data/${encodeURIComponent(artifactId)}`,
-      { headers: auth },
-    )
-    if (response.status === 404) return []
-    if (!response.ok) {
-      throw await responseError(response, `Could not list artifact data (${response.status}).`)
-    }
-    const body = await response.json()
-    return Array.isArray(body?.keys) ? body.keys : []
+    // Ordinary app storage already derives listings from the directory, so no
+    // client-maintained index or Pages-specific API is needed.
+    const entries = await list(`artifact-data/${artifactId}`)
+    return entries
+      .filter((entry) => entry?.type === 'file' && /^[a-z0-9._-]{1,64}\.json$/.test(entry.name || ''))
+      .map((entry) => entry.name.slice(0, -5))
+      .sort()
   }
 
   async function artifactDataSet(artifactId, key, value) {
-    const response = await fetch(artifactDataUrl(artifactId, key), {
-      method: 'PUT',
-      headers: { ...auth, 'Content-Type': 'application/json' },
-      body: JSON.stringify(value),
-    })
-    if (!response.ok) {
-      throw await responseError(response, `Could not save artifact data (${response.status}).`)
-    }
+    await setJSON(artifactDataPath(artifactId, key), value)
   }
 
   async function artifactDataRemove(artifactId, key) {
-    const response = await fetch(artifactDataUrl(artifactId, key), {
-      method: 'DELETE',
-      headers: auth,
-    })
-    if (!response.ok && response.status !== 404) {
-      throw await responseError(response, `Could not remove artifact data (${response.status}).`)
-    }
+    await remove(artifactDataPath(artifactId, key))
   }
 
   return {

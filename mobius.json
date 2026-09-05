@@ -1,8 +1,8 @@
 {
   "id": "artifacts",
-  "name": "Artifacts",
+  "name": "Pages",
   "version": "0.6.3",
-  "description": "Browse, preview, version, share, view, copy, and download interactive pages and polished documents created in M\u00f6bius chats.",
+  "description": "Browse, preview, version, share, view, copy, and download self-contained pages — interactive mockups, explainers, and polished documents — created in Möbius chats.",
   "author": "mobius-os",
   "license": "MIT",
   "homepage": "https://github.com/mobius-os/app-artifacts",

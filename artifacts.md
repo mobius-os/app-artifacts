@@ -1,42 +1,50 @@
-# Building artifacts
+# Building pages (the Pages app)
 
-An artifact is a single self-contained HTML page — interactive (a chart,
+A page is a single self-contained HTML file — interactive (a chart,
 calculator, small game, animated explainer), a design mockup (a proposed UI, a
 flow diagram, an interactive explainer of a tradeoff), or a polished document (a
 report, write-up, brief, or code explanation) — that the partner can open,
-version, and share from the Artifacts app. You build the page; the Artifacts app
-is its gallery: it shows which chat each artifact came from, its version
-history, a live preview, and a public share button. This file is the source of
-truth for how artifacts are stored and linked. Read this before building
-anything you would call an artifact, canvas, visualization, mockup, report, or
-shareable page — and before iterating on one that already exists.
+version, and share from the Pages app. You build the page; the Pages app is its
+gallery: it shows which chat each page came from, its version history, a live
+preview, and a public share button. This file is the source of truth for how
+pages are stored and linked. Read this before building anything you would call
+a canvas, visualization, mockup, report, or shareable page — and before
+iterating on one that already exists.
+
+Naming: the Pages app's storage tree and ids still use the word `artifact`
+(`artifacts/<artifact_id>.json`, `intent=artifact:<id>`). That is durable
+storage identity, not product vocabulary. In the partner's words a Pages item is
+a **page**; an **artifact** is a Project's build output (a compiled PDF, a
+built website) and lives with its Project, not here.
 
 ---
 
-## Artifact or mini-app?
+## Page or mini-app?
 
-Reach for an artifact when the thing is **significant and self-contained** —
+Reach for a page when the thing is **significant and self-contained** —
 substantial enough to stand on its own (a rule of thumb: more than a dozen
 lines, not a one-liner you'd just put in the chat).
 
-| Build an ARTIFACT when… | Build a MINI-APP when… |
+| Build a PAGE when… | Build a MINI-APP when… |
 |---|---|
 | It is a self-contained page to look at, play with, read, or share — a viz, mockup, UI design, diagram, report, calculator, infographic, small game, document | It is a durable tool the partner returns to, with saved records and its own data model |
 | It needs no storage or only small public-readable shared JSON; no embedded chat or cron — the page IS the product | It needs private records, `window.mobius` APIs, notifications, schedules, or registration |
 | A logged-out person you share it with should be able to use it | It only makes sense inside Möbius |
 
 When genuinely unsure, name both options in your clarifying turn and let the
-partner pick. An artifact is much cheaper — prefer it for one-shot interactive
-content and for standalone documents.
+partner pick. A page is much cheaper — prefer it for one-shot interactive
+content and for standalone documents. When the partner is working inside a
+Project (a `$PROJECT_ROOT` is set), build the Project's artifact instead — see
+the project skill for that Project type.
 
 ## Suggest before building
 
-An artifact can be the best feedback surface without being the best *first*
+A page can be the best feedback surface without being the best *first*
 action. When a choice is primarily visual, spatial, or comparative and seeing
 options would materially improve the partner's answer, offer a concrete
 clarifying-question option such as **Create a visual comparison
-(Recommended)**. Include concise non-artifact alternatives when they remain
-reasonable. Do not create the artifact unless the partner chooses that option
+(Recommended)**. Include concise non-page alternatives when they remain
+reasonable. Do not create the page unless the partner chooses that option
 or explicitly requests one.
 
 Good moments to suggest one include choosing between interface directions,
@@ -48,9 +56,9 @@ straightforward defaults, and nonvisual decisions that are clearer in chat.
 
 ## Persisting data (optional)
 
-Stay stateless by default. When a shared artifact genuinely needs owner-set
+Stay stateless by default. When a shared page genuinely needs owner-set
 state—such as configuration, a counter, leaderboard, or dashboard data—use the
-injected `window.mobiusArtifact.storage` API. It is shared per artifact, carries
+injected `window.mobiusArtifact.storage` API. It is shared per page, carries
 across versions, and works automatically in previews and public shares; never
 handle a share token yourself.
 
@@ -70,18 +78,18 @@ Check `store.writable` before showing write controls. `store.mode` is `editor`
 in preview and `public-readonly` in a shared page; historical previews are also
 read-only. Public viewers can read the shared data, so never store secrets, PII,
 or private source material. Values must be JSON; keys match
-`[a-z0-9._-]{1,64}`, each value is at most 64 KB, and the server caps an
-artifact at 1 MB and 100 stored keys. `list()` is answered by the server from
+`[a-z0-9._-]{1,64}`, each value is at most 64 KB, and the server caps a
+page at 1 MB and 100 stored keys. `list()` is answered by the server from
 what is actually stored, so it never drifts from `set()`/`remove()`. `set()` and `remove()` reject when writes
 are unavailable—they never pretend to save.
 
 ---
 
-## Where artifacts live
+## Where pages live
 
-Artifacts are files in the **Artifacts app's storage tree**:
+Pages are files in the **Pages app's storage tree**:
 `/data/apps/<ARTIFACTS_APP_ID>/` where `ARTIFACTS_APP_ID` is the app's
-**numeric id**. Resolve it fresh every time — it changes if the app is ever
+**numeric id** (its slug remains `artifacts`). Resolve it fresh every time — it changes if the app is ever
 reinstalled, so never hardcode it:
 
 ```bash
@@ -90,24 +98,51 @@ ARTIFACTS_APP_ID=$(curl -fsS -H "Authorization: Bearer $AGENT_TOKEN" \
   "import sys,json; print(next((a['id'] for a in json.load(sys.stdin) if a.get('slug')=='artifacts'),''))")
 ```
 
-If it comes back empty, the Artifacts app is not installed — tell the partner
+If it comes back empty, the Pages app is not installed — tell the partner
 to install it from the App Store, and offer to build the page as a plain
 mini-app instead. **Do not confuse the storage tree with
 `/data/apps/artifacts/`** — that slug-named directory is the viewer app's
-source code; never write artifacts there.
+source code; never write pages there.
 
-Inside the storage tree, you own exactly two paths:
+Inside the storage tree, an ordinary page uses two paths. A format skill
+may additionally preserve editable inputs under the optional third path:
 
 ```
 artifacts/<artifact_id>.json      # the record — metadata + version index
 versions/<artifact_id>/v<N>.html  # one immutable file per version
+sources/<artifact_id>/...         # optional editable inputs for Project import
 ```
 
-An artifact can also carry an optional `related_apps` array when it is
+Keep `sources/` absent for an ordinary self-contained page. Use it
+only when an installed format skill explicitly defines how to recreate an
+editable Project (for example, LaTeX source behind a compiled document). In
+that case the record may include:
+
+```json
+{
+  "project_import": {
+    "template_id": "latex:document",
+    "files": [
+      {"storage_path": "sources/<artifact_id>/main.tex", "path": "main.tex"}
+    ]
+  }
+}
+```
+
+`template_id` must name an installed Project type. Each `storage_path` is
+relative to the Pages app's numeric storage root and each `path` is the
+editable destination inside the new Project. List only real source inputs,
+never generated output, private data, symlinks, or unrelated files. Projects
+imports these as an independent copy (**Projects → New → Import existing**);
+later Project edits do not mutate the page or its source snapshot. When
+iterating a page, preserve existing `project_import` metadata unless the source
+snapshot is deliberately updated.
+
+A page can also carry an optional `related_apps` array when it is
 specifically about an existing Möbius app — for example, a redesign mockup,
 flow diagram, or report for that app. Each entry uses the app row's real
 identity: `{"id": 39, "slug": "app-store", "name": "App Store"}`. This is
-separate from `chat_id` provenance: the artifact remains linked to the chat
+separate from `chat_id` provenance: the page remains linked to the chat
 that created each version, while also appearing among the work in the related
 app's current maintaining chat.
 
@@ -116,7 +151,7 @@ the current linked-app context or the live apps list. Include `id`, `slug`, and
 `name` when available. The slug is the durable identity across installations;
 the numeric id is only a fallback for older slug-less relationships. Never
 infer a relationship from a similar title.
-When iterating an artifact, preserve its existing relationships rather than
+When iterating a page, preserve its existing relationships rather than
 replacing them with whatever apps happen to be linked to the current chat.
 
 **Never touch `shares/` or `projects/`** — those are the app's own bookkeeping
@@ -124,7 +159,7 @@ for public sharing. Sharing is the partner's action, taken in the app.
 
 ---
 
-## Create an artifact
+## Create a page
 
 1. Author the page (rules below) and save it to a temp file.
 2. Mint the id: slugified title + 4 random hex, all `[a-z0-9-]`, ≤ 45 chars
@@ -134,7 +169,7 @@ for public sharing. Sharing is the partner's action, taken in the app.
    `"` or `$(...)` in it would break or inject), use a **quoted** heredoc, and
    write the record **atomically** (unique temp + `os.replace`) so the live
    gallery never reads a half-written file. Create the blob with `noclobber`
-   so a rare id collision can never overwrite an existing artifact:
+   so a rare id collision can never overwrite an existing page:
 
 ```bash
 AID="tip-calculator-$(openssl rand -hex 2)"
@@ -142,7 +177,7 @@ D="/data/apps/$ARTIFACTS_APP_ID"
 NOW=$(date -u +%FT%TZ)
 TITLE="Tip Calculator"
 DESC="Split a bill and compute per-person tips."
-# If this artifact is explicitly about an existing app, copy its real identity
+# If this page is explicitly about an existing app, copy its real identity
 # from linked-app context; otherwise keep this as an empty JSON array.
 RELATED_APPS_JSON='[]'
 
@@ -181,12 +216,12 @@ safer choice for large pages.
 
 ---
 
-## Iterate an existing artifact
+## Iterate an existing page
 
 Find the id first: it is in your earlier reply's link, or list
 `$D/artifacts/` and match by title or `chat_id`. Then:
 
-1. **Reuse the same `artifact_id`** — a new id would create a second artifact
+1. **Reuse the same `artifact_id`** — a new id would create a second page
    instead of a new version.
 2. **Never overwrite an existing `v<N>.html`** — history is immutable. Write
    the next free version number, and refuse to clobber if it already exists
@@ -217,18 +252,18 @@ PY
 3. Read the record fresh before appending (a different chat may have added a
    version) and bump `current_version` + `updated_at`.
 
-If the partner shared the artifact publicly, the shared page keeps showing the
+If the partner shared the page publicly, the shared copy keeps showing the
 version it was shared at — tell them they can update the shared version from
 the app's Share sheet.
 
 ---
 
-## Authoring rules — what makes a good artifact
+## Authoring rules — what makes a good page
 
 - **One file, everything inline.** All CSS in `<style>`, all JS in inline
   `<script>`, images as inline SVG or `data:` URIs. **No CDNs, no webfonts, no
   remote `<script src>`** — the preview runs in a sandbox and shared pages must
-  work anywhere; an external request is a broken artifact.
+  work anywhere; an external request is a broken page.
 - **Mobile-first.** `<meta name="viewport" content="width=device-width, initial-scale=1">`,
   fluid layout, tap targets ≥ 44px. The partner opens these on a phone.
 - **Design both themes** with `@media (prefers-color-scheme: dark)` — unless
@@ -238,7 +273,7 @@ the app's Share sheet.
   color; a game or showpiece earns a scene. Don't over-design utility pages,
   don't under-design the centerpiece. Real content throughout — never lorem.
 - **Robust.** Wrap risky JS in try/catch and render a visible fallback message;
-  a crashed artifact must not be a blank page.
+  a crashed page must not be blank.
 - **Lean.** Keep the file well under 50 MB (large `data:` assets count) — the
   storage tree is capped at 1 GB; prefer SVG and generated canvas over big
   base64 blobs.
@@ -247,11 +282,11 @@ the app's Share sheet.
 
 ### Documents and reports
 
-A report, brief, write-up, or code explanation is a first-class artifact.
+A report, brief, write-up, or code explanation is a first-class page.
 Render it as **semantic, self-contained HTML** — `<article>`, real headings,
 paragraphs, lists, tables, links, and `<pre><code>` for code — with readable
 typography and selectable text. Don't invent interactivity a document doesn't
-need. Storage stays `.html` like any other artifact.
+need. Storage stays `.html` like any other page.
 
 ### Diagrams
 
@@ -264,7 +299,7 @@ offline.
 
 ## Link it back in the chat
 
-End your reply with the artifact link — the shell opens it in place:
+End your reply with the page link — the shell opens it in place:
 
 ```
 [Open "Tip Calculator" →](/shell/?app=artifacts&intent=artifact:<artifact_id>)
@@ -275,7 +310,7 @@ Also send the durable notification so the partner can tap in later:
 ```bash
 curl -fsS -X POST "$API_BASE_URL/api/notifications/send" \
   -H "Authorization: Bearer $AGENT_TOKEN" -H "Content-Type: application/json" \
-  -d '{"title": "Artifact ready", "body": "Tip Calculator is ready to open and share.",
+  -d '{"title": "Page ready", "body": "Tip Calculator is ready to open and share.",
        "source_id": "'"$CHAT_ID"'",
        "target": "/shell/?app=artifacts&intent=artifact:'"$AID"'"}'
 ```
@@ -286,9 +321,10 @@ curl -fsS -X POST "$API_BASE_URL/api/notifications/send" \
 
 | If this turn… | Do before finishing |
 |---|---|
-| Built an artifact | Verify both files exist and the record parses (`python3 -m json.tool`); reply in partner language (what it does, not how it's stored); end with the Open link; send the notification. |
+| Built a page | Verify both files exist and the record parses (`python3 -m json.tool`); reply in partner language (what it does, not how it's stored); end with the Open link; send the notification. |
 | Iterated one | Confirm `current_version` bumped and the new `v<N>.html` exists; say what changed; re-link it. If it was shared, mention the Share sheet can update the public version. |
 | Hit a gotcha | Log it the usual way so future-you avoids it. |
 
-Sharing, version browsing, downloading, and deletion are the partner's actions
-inside the Artifacts app — point them there rather than doing it for them.
+Sharing, version browsing, downloading, deletion, and importing into Projects
+are the partner's actions inside the Pages app and Projects — point them there
+rather than doing it for them.

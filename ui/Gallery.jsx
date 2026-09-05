@@ -148,18 +148,18 @@ export function Gallery({ appId, storage, onOpen, inactive = false }) {
               : <span className="af-mark-fallback">A</span>}
           </span>
           <div className="af-brand-copy">
-            <h1>Artifacts</h1>
-            <p aria-live="polite">{status === 'loading' ? 'Loading your catalog…' : `${artifacts.length} ${artifacts.length === 1 ? 'artifact' : 'artifacts'} · ${versionCount} ${versionCount === 1 ? 'version' : 'versions'}${sharedCount ? ` · ${sharedCount} shared` : ''}`}</p>
+            <h1>Pages</h1>
+            <p aria-live="polite">{status === 'loading' ? 'Loading your catalog…' : `${artifacts.length} ${artifacts.length === 1 ? 'page' : 'pages'} · ${versionCount} ${versionCount === 1 ? 'version' : 'versions'}${sharedCount ? ` · ${sharedCount} shared` : ''}`}</p>
           </div>
         </div>
       </header>
 
       <main className="af-scroll" id="af-main">
         <div className="af-page">
-          <section className="af-skill-note" aria-label="About Artifacts">
+          <section className="af-skill-note" aria-label="About Pages">
             <img className="af-skill-note-icon" src={SKILLS_ICON} alt="" aria-hidden="true" />
             <div>
-              <strong>Artifacts comes with a creation skill.</strong>
+              <strong>Pages comes with a creation skill.</strong>
               <span>Ask for a mockup, diagram, interactive explainer, or polished report in any chat; Möbius will keep it here with its versions and source conversation.</span>
             </div>
           </section>

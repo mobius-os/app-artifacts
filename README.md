@@ -1,8 +1,8 @@
-# Artifacts
+# Pages
 
-Artifacts is the Möbius catalog for interactive HTML pages, visualizations, and polished documents created by the in-product agent. It gives owners one place to browse their artifacts, preview or inspect each version, copy or download its HTML, return to the originating chat, and publish a stable public snapshot.
+Pages is the Möbius catalog for self-contained pages — interactive mockups, visualizations, explainers, and polished documents — created by the in-product agent. (The app's slug and storage tree keep the historical name `artifacts`; a Project's build output is the thing Möbius calls an artifact.) It gives owners one place to browse their pages, preview or inspect each version, copy or download its HTML, return to the originating chat, and publish a stable public snapshot.
 
-Artifacts ships an always-on prompt fragment that nudges the agent to offer visuals when they would help.
+Pages ships an always-on prompt fragment that nudges the agent to offer visuals when they would help.
 
 ## What it does
 
