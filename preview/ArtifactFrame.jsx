@@ -3,6 +3,8 @@ import { ReloadIcon } from '../ui/Icons.jsx'
 import { injectArtifactStorageShim, versionPath } from '../domain.js'
 import { injectArtifactPreviewLinkShim } from './artifactLinks.js'
 
+const PreviewFrame = window.mobius.createPreviewFrame(React)
+
 export function ArtifactFrame({
   artifactId,
   version,
@@ -86,7 +88,7 @@ export function ArtifactFrame({
         </div>
       )}
       {(state.status === 'staged' || state.status === 'ready') && (
-        <iframe
+        <PreviewFrame
           key={`${artifactId}:${version}:${reloadTick}:${localReload}`}
           className={`af-preview-frame${state.status === 'ready' ? ' is-ready' : ''}`}
           title={`Artifact preview, version ${version}`}

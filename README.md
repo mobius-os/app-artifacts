@@ -8,6 +8,7 @@ Pages ships an always-on prompt fragment that nudges the agent to offer visuals 
 
 - Polls the app storage catalog while visible and reflects agent-created records without a reload.
 - Runs self-contained HTML in an opaque nested iframe with scripts and popups, but no same-origin access.
+- Uses Möbius's shared `createPreviewFrame(React)` component so shell shortcuts follow focus into interactive previews automatically; link and storage behavior remain Pages-owned.
 - Shows immutable version history and lets the owner preview or inspect syntax-coloured, read-only source for any recorded version.
 - Copies selected-version HTML as plain text and downloads it with an explicit scripts warning.
 - Resolves origin chat titles through the redacted chat-log summary permission.
