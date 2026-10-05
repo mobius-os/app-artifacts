@@ -15,7 +15,7 @@ export function artifactShellShortcutShimSource() {
 var shortcuts=[];
 addEventListener('message',function(e){if(e.source===parent&&e.data&&e.data.type==='moebius:frame-shortcuts')shortcuts=e.data.shortcuts||[]});
 document.addEventListener('keydown',function(e){
-if(e.isComposing||e.repeat)return;
+if(e.isComposing||e.repeat||(e.getModifierState&&e.getModifierState('AltGraph')))return;
 var hit=shortcuts.find(function(s){var b=s.binding;return String(e.key).toLowerCase()===String(b.key).toLowerCase()&&(e.metaKey||e.ctrlKey)===!!b.mod&&e.shiftKey===!!b.shift&&e.altKey===!!b.alt});
 if(!hit)return;
 e.preventDefault();e.stopImmediatePropagation();

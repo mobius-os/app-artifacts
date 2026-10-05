@@ -1,7 +1,7 @@
 {
   "id": "pages",
   "name": "Pages",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Browse, preview, version, share, view, copy, and download self-contained pages — interactive mockups, explainers, and polished documents — created in Möbius chats.",
   "author": "mobius-os",
   "license": "MIT",

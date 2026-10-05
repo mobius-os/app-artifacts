@@ -88,6 +88,24 @@ test('unadvertised keys, extra modifiers, repeats, and composition stay with the
   assert.deepEqual(frame.posted, [])
 })
 
+test('AltGr never runs a Ctrl+Alt shortcut, a real Ctrl+Alt chord still does', () => {
+  const frame = previewShortcuts()
+  const binding = { actionId: 'chord', binding: { key: 'q', mod: true, shift: false, alt: true } }
+  frame.receive({ type: 'moebius:frame-shortcuts', shortcuts: [binding] })
+  frame.posted.length = 0
+
+  const altGr = keyEvent('q', { ctrlKey: true, altKey: true, getModifierState: (m) => m === 'AltGraph' })
+  frame.keydown.listener(altGr)
+  assert.equal(altGr.prevented, false)
+  assert.equal(altGr.stopped, false)
+  assert.deepEqual(frame.posted, [])
+
+  const chord = keyEvent('q', { ctrlKey: true, altKey: true, getModifierState: () => false })
+  frame.keydown.listener(chord)
+  assert.equal(chord.prevented, true)
+  assert.deepEqual(frame.posted.map((p) => p.data), [{ type: 'moebius:shell-shortcut', actionId: 'chord' }])
+})
+
 test('nothing is captured before an advertisement or from a non-parent sender', () => {
   const frame = previewShortcuts()
   frame.posted.length = 0
