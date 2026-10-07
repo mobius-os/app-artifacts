@@ -20,6 +20,7 @@ import { VersionSheet } from './VersionTimeline.jsx'
 import { ArtifactOptionsSheet, DeleteSheet, ShareSheet } from './ShareSheet.jsx'
 import { copyPlainText } from './clipboard.js'
 import { createDetailSync } from './detailSync.js'
+import { startAdaptivePoll, watchFrameVisibility } from './adaptivePoll.js'
 import {
   ArrowLeftIcon,
   CodeIcon,
@@ -84,7 +85,17 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     setSelectedVersion(null)
     setViewMode('preview')
     setSourceState({ key: '', status: 'idle', html: '', message: '' })
+    // Set when a poll observes a different record or share, so the poll
+    // keeps its fast cadence only while the page is actually changing.
+    let lastSeen = { record: undefined, share: undefined }
+    let observedChange = false
+    const noteObserved = (kind, value) => {
+      const stamp = JSON.stringify(value ?? null)
+      if (lastSeen[kind] !== undefined && lastSeen[kind] !== stamp) observedChange = true
+      lastSeen = { ...lastSeen, [kind]: stamp }
+    }
     const acceptRecord = (value) => {
+      noteObserved('record', value)
       setRecord((current) => {
         if (!value) return null
         if (!current || current.id !== value.id) return value
@@ -97,6 +108,7 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
       setStatus(value ? 'ready' : 'missing')
     }
     const acceptShare = (value) => {
+      noteObserved('share', value)
       if (value) {
         setShare(value)
         setShareKnown(true)
@@ -123,20 +135,30 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     })
     detailSyncRef.current = sync
     sync.start()
+    let poll = null
+    const visibility = watchFrameVisibility((visible) => {
+      if (!visible) return
+      poll?.poke()
+      refresh({ forceShare: true })
+    })
     const refresh = (options) => {
-      if (document.visibilityState !== 'hidden') void sync.refresh(options)
+      if (visibility.isVisible()) void sync.refresh(options)
     }
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') refresh({ forceShare: true })
+    poll = startAdaptivePoll(async () => {
+      if (!visibility.isVisible()) return false
+      observedChange = false
+      await sync.refresh()
+      return observedChange
+    })
+    const onFocus = () => {
+      poll.poke()
+      refresh({ forceShare: true })
     }
-    const onFocus = () => refresh({ forceShare: true })
-    const timer = window.setInterval(refresh, 3500)
     window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVisibility)
     return () => {
-      window.clearInterval(timer)
+      poll.stop()
+      visibility.stop()
       window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVisibility)
       if (detailSyncRef.current === sync) detailSyncRef.current = null
       sync.dispose()
     }

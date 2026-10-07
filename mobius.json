@@ -29,6 +29,7 @@
     "preview/ArtifactFrame.jsx",
     "preview/artifactLinks.js",
     "preview/shellShortcuts.js",
+    "ui/adaptivePoll.js",
     "ui/ArtifactCard.jsx",
     "ui/ArtifactThumbnail.jsx",
     "ui/catalogSnapshot.js",
