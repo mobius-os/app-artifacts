@@ -128,8 +128,8 @@ test('gallery preview enrichment cannot make the artifact catalogue unavailable'
   const gallery = await readSource('ui/Gallery.jsx')
   assert.match(
     gallery,
-    /readFolder\(storage, 'shares\/'\)\.catch\(\(\) => \[\]\)/,
-    'sharing badges must fail open so records remain accessible',
+    /readFolder\(storage, 'shares\/', \{ withContent: true \}\)\.catch\(\(\) => \[\]\)/,
+    'sharing badges must fail open so records remain accessible, and show queued local publish/stop values',
   )
 
   const thumbnail = await readSource('ui/ArtifactThumbnail.jsx')
