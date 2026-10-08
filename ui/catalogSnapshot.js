@@ -64,14 +64,31 @@ export function folderSignature(storage, prefix) {
   return folderCache(storage, prefix).signature
 }
 
-// Lists the folder without content and reads only records whose stamp moved,
-// so a poll that finds nothing new costs one small listing.
+// After a content-backed cold mount, unchanged agent-owned folders cost only
+// a metadata listing. App-owned share listings also include effective values.
 export async function readFolder(storage, prefix) {
   const cache = folderCache(storage, prefix)
-  const listed = (await storage.list(prefix))
-    .map((entry) => ({ path: entryPath(prefix, entry), stamp: entryStamp(entry) }))
+  const listed = (await storage.list(prefix, cache.signature === null ? { includeContent: true } : {}))
+    .map((entry) => ({ ...entry, path: entryPath(prefix, entry), stamp: entryStamp(entry) }))
     .filter(({ path }) => typeof path === 'string' && path.endsWith('.json'))
-  const stale = listed.filter(({ path, stamp }) => !stamp || cache.records.get(path)?.stamp !== stamp)
+  // Cold mounts need cached runtime bodies too. Content listings also carry
+  // queued local values, which can change without a server stamp changing.
+  for (const { path, stamp, content } of listed) {
+    if (content !== undefined) cache.records.set(path, { stamp, value: parseEntryContent(content) })
+  }
+  async function readRecord(path, stamp) {
+    try {
+      cache.records.set(path, { stamp, value: await storage.getFresh(path) })
+    } catch {
+      // Keep an offline body, but not its server stamp: retry authority later.
+      const value = storage.get ? await storage.get(path).catch(() => null) : null
+      if (value != null) cache.records.set(path, { stamp: '', value })
+      else if (cache.records.has(path)) cache.records.get(path).stamp = ''
+      else cache.records.delete(path)
+    }
+  }
+  const stale = listed.filter(({ path, stamp, content }) => content === undefined
+    && (!stamp || cache.records.get(path)?.stamp !== stamp))
   if (stale.length > CONTENT_LIST_THRESHOLD) {
     const entries = await storage.list(prefix, { includeContent: true })
     await Promise.all(entries.map(async (entry) => {
@@ -81,22 +98,11 @@ export async function readFolder(storage, prefix) {
         cache.records.set(path, { stamp: entryStamp(entry), value: parseEntryContent(entry.content) })
         return
       }
-      try {
-        cache.records.set(path, { stamp: entryStamp(entry), value: await storage.getFresh(path) })
-      } catch {
-        // Unreadable now: forget it so the next poll retries the read instead
-        // of trusting a cached miss under an unchanged stamp.
-        cache.records.delete(path)
-      }
+      await readRecord(path, entryStamp(entry))
     }))
   } else {
     await Promise.all(stale.map(async ({ path, stamp }) => {
-      try {
-        cache.records.set(path, { stamp, value: await storage.getFresh(path) })
-      } catch {
-        // Unreadable now: forget it so the next poll retries the read.
-        cache.records.delete(path)
-      }
+      await readRecord(path, stamp)
     }))
   }
   const present = new Set(listed.map(({ path }) => path))
@@ -104,8 +110,11 @@ export async function readFolder(storage, prefix) {
     if (!present.has(path)) cache.records.delete(path)
   }
   cache.signature = listed
-    .map(({ path, stamp }) => `${path}@${stamp || JSON.stringify(cache.records.get(path)?.value ?? null)}`)
+    .map(({ path, stamp }) => `${path}@${stamp}:${JSON.stringify(cache.records.get(path)?.value ?? null)}`)
     .join('|')
+  if (listed.length && !listed.some(({ path }) => cache.records.get(path)?.value)) {
+    throw new Error('Could not read the known catalog records. Go online and try again.')
+  }
   return listed
     .map(({ path }) => cache.records.get(path)?.value)
     .filter((value) => value && typeof value === 'object')

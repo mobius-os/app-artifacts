@@ -94,7 +94,10 @@ export function makeStorage(appId, token) {
   }
 
   async function list(prefix = '', options = {}) {
-    if (runtime?.list) return runtime.list(prefix, options)
+    // Share rows are app-written and may still be queued. Their server stamps
+    // do not describe the runtime's effective publish/stop value.
+    if (runtime?.list) return runtime.list(prefix, prefix.replace(/\/+$/, '') === 'shares'
+      ? { ...options, includeContent: true } : options)
     const entries = []
     let cursor = null
     do {

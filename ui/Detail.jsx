@@ -146,9 +146,12 @@ export function Detail({ artifactId, storage, token, onPreviewFrame, onClose, on
     }
     poll = startAdaptivePoll(async () => {
       if (!visibility.isVisible()) return false
+      // Each path is deduplicated by the synchronizer. Do not wait for both:
+      // a stalled record must not prevent the next independent share read.
+      const changed = observedChange
       observedChange = false
-      await sync.refresh()
-      return observedChange
+      void sync.refresh()
+      return changed
     })
     const onFocus = () => {
       poll.poke()
