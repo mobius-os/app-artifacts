@@ -64,7 +64,9 @@ export function Gallery({ appId, storage, onOpen, inactive = false }) {
       const allRecords = await readFolder(storage, 'artifacts/')
       // Sharing badges enrich the catalogue but never own it. If that folder
       // is temporarily unavailable, every artifact must still be accessible.
-      const shareRecords = await readFolder(storage, 'shares/').catch(() => [])
+      // Pages writes share rows itself, so a publish or stop still queued
+      // offline is only visible in the listing's content.
+      const shareRecords = await readFolder(storage, 'shares/', { withContent: true }).catch(() => [])
       if (id !== loadId.current) return false
       // A record's own `id` is interpolated into storage paths and request URLs
       // downstream, and only deep-linked ids were validated before. Drop any

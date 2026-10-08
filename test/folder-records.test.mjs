@@ -48,3 +48,80 @@ test('an unchanged folder is not re-read after a successful bulk read', async ()
   assert.equal(again.length, CONTENT_LIST_THRESHOLD + 2)
   assert.equal(storage.reads(), 1)
 })
+
+// A runtime-backed folder: listings carry server stamps, content listings carry
+// the runtime's effective bodies (cached, with queued local writes on top), and
+// getFresh reaches the server only while online.
+function runtimeFolder(prefix, records) {
+  const server = new Map(records.map((record) => [`${prefix}${record.id}.json`, record]))
+  const queued = new Map()
+  let online = true
+  let freshReads = 0
+  const effective = (path) => queued.get(path) ?? server.get(path)
+  return {
+    goOffline() { online = false },
+    queueLocal(record) { queued.set(`${prefix}${record.id}.json`, record) },
+    freshReads: () => freshReads,
+    async list(_prefix, options = {}) {
+      return [...new Set([...server.keys(), ...queued.keys()])].map((path) => ({
+        path,
+        ...(server.has(path) ? { modified_at: '2026-10-07T10:00:00Z', size: 10 } : {}),
+        ...(options.includeContent ? { content: JSON.stringify(effective(path)) } : {}),
+      }))
+    },
+    async get(path) {
+      return effective(path) ?? null
+    },
+    async getFresh(path) {
+      freshReads += 1
+      if (!online) throw new Error('Offline')
+      return server.get(path) ?? null
+    },
+  }
+}
+
+test('opening the gallery offline shows the runtime-cached catalog', async () => {
+  const storage = runtimeFolder('artifacts/', [{ id: 'p0' }, { id: 'p1' }])
+  storage.goOffline()
+  const records = await readFolder(storage, 'artifacts/')
+  assert.deepEqual(records.map((record) => record.id), ['p0', 'p1'])
+})
+
+test('a record that cannot be re-read offline keeps its cached body', async () => {
+  const storage = runtimeFolder('artifacts/', [{ id: 'p0' }])
+  await readFolder(storage, 'artifacts/')
+  storage.goOffline()
+  // A missing stamp marks the record changed, forcing a read that now fails.
+  const list = storage.list
+  storage.list = async (...args) => (await list(...args)).map(({ modified_at, size, ...entry }) => entry)
+  const records = await readFolder(storage, 'artifacts/')
+  assert.deepEqual(records.map((record) => record.id), ['p0'])
+})
+
+test('a queued publish or stop is not replaced by the unchanged server value', async () => {
+  const storage = runtimeFolder('shares/', [{ id: 'p0', project_id: 'p0', published: false }])
+  const first = await readFolder(storage, 'shares/', { withContent: true })
+  assert.equal(first[0].published, false)
+
+  storage.queueLocal({ id: 'p0', project_id: 'p0', published: true })
+  const queued = await readFolder(storage, 'shares/', { withContent: true })
+  assert.equal(queued[0].published, true)
+  const again = await readFolder(storage, 'shares/', { withContent: true })
+  assert.equal(again[0].published, true, 'the next poll must not flip back')
+  assert.equal(storage.freshReads(), 0, 'content listings need no per-record reads')
+})
+
+test('after the first content read, unchanged polls only list metadata', async () => {
+  const storage = runtimeFolder('artifacts/', [{ id: 'p0' }, { id: 'p1' }])
+  const listings = []
+  const list = storage.list
+  storage.list = (prefix, options = {}) => {
+    listings.push(Boolean(options.includeContent))
+    return list(prefix, options)
+  }
+  await readFolder(storage, 'artifacts/')
+  await readFolder(storage, 'artifacts/')
+  await readFolder(storage, 'artifacts/')
+  assert.deepEqual(listings, [true, false, false])
+  assert.equal(storage.freshReads(), 0)
+})

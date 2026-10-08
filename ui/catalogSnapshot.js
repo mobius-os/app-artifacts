@@ -64,47 +64,53 @@ export function folderSignature(storage, prefix) {
   return folderCache(storage, prefix).signature
 }
 
+async function readRecord(storage, cache, path, stamp) {
+  try {
+    cache.records.set(path, { stamp, value: await storage.getFresh(path) })
+  } catch {
+    // Offline or unreadable now: keep showing the runtime's cached body (or
+    // the last one read), without its stamp so the next poll retries the read.
+    const cached = storage.get ? await storage.get(path).catch(() => null) : null
+    const value = cached ?? cache.records.get(path)?.value
+    if (value == null) cache.records.delete(path)
+    else cache.records.set(path, { stamp: '', value })
+  }
+}
+
+function listedEntries(prefix, entries) {
+  return entries
+    .map((entry) => ({ path: entryPath(prefix, entry), stamp: entryStamp(entry), content: entry?.content }))
+    .filter(({ path }) => typeof path === 'string' && path.endsWith('.json'))
+}
+
 // Lists the folder without content and reads only records whose stamp moved,
 // so a poll that finds nothing new costs one small listing.
-export async function readFolder(storage, prefix) {
+//
+// The first read of a folder takes bodies from a content-bearing listing:
+// offline, only the runtime's listing can supply its cached and queued bodies.
+// `withContent` keeps every listing content-bearing, for folders this app
+// writes itself: a queued local write changes the runtime's effective value
+// without moving the server stamp.
+export async function readFolder(storage, prefix, { withContent = false } = {}) {
   const cache = folderCache(storage, prefix)
-  const listed = (await storage.list(prefix))
-    .map((entry) => ({ path: entryPath(prefix, entry), stamp: entryStamp(entry) }))
-    .filter(({ path }) => typeof path === 'string' && path.endsWith('.json'))
-  const stale = listed.filter(({ path, stamp }) => !stamp || cache.records.get(path)?.stamp !== stamp)
-  if (stale.length > CONTENT_LIST_THRESHOLD) {
-    const entries = await storage.list(prefix, { includeContent: true })
-    await Promise.all(entries.map(async (entry) => {
-      const path = entryPath(prefix, entry)
-      if (typeof path !== 'string' || !path.endsWith('.json')) return
-      if (entry?.content !== undefined) {
-        cache.records.set(path, { stamp: entryStamp(entry), value: parseEntryContent(entry.content) })
-        return
-      }
-      try {
-        cache.records.set(path, { stamp: entryStamp(entry), value: await storage.getFresh(path) })
-      } catch {
-        // Unreadable now: forget it so the next poll retries the read instead
-        // of trusting a cached miss under an unchanged stamp.
-        cache.records.delete(path)
-      }
-    }))
-  } else {
-    await Promise.all(stale.map(async ({ path, stamp }) => {
-      try {
-        cache.records.set(path, { stamp, value: await storage.getFresh(path) })
-      } catch {
-        // Unreadable now: forget it so the next poll retries the read.
-        cache.records.delete(path)
-      }
-    }))
+  const contentListing = withContent || cache.signature === null
+  let listed = listedEntries(prefix, await storage.list(prefix, contentListing ? { includeContent: true } : {}))
+  const isStale = ({ path, stamp, content }) => content === undefined
+    && (!stamp || cache.records.get(path)?.stamp !== stamp)
+  if (!contentListing && listed.filter(isStale).length > CONTENT_LIST_THRESHOLD) {
+    listed = listedEntries(prefix, await storage.list(prefix, { includeContent: true }))
   }
+  const stale = listed.filter(isStale)
+  for (const { path, stamp, content } of listed) {
+    if (content !== undefined) cache.records.set(path, { stamp, value: parseEntryContent(content) })
+  }
+  await Promise.all(stale.map(({ path, stamp }) => readRecord(storage, cache, path, stamp)))
   const present = new Set(listed.map(({ path }) => path))
   for (const path of cache.records.keys()) {
     if (!present.has(path)) cache.records.delete(path)
   }
   cache.signature = listed
-    .map(({ path, stamp }) => `${path}@${stamp || JSON.stringify(cache.records.get(path)?.value ?? null)}`)
+    .map(({ path, stamp }) => `${path}@${stamp}:${JSON.stringify(cache.records.get(path)?.value ?? null)}`)
     .join('|')
   return listed
     .map(({ path }) => cache.records.get(path)?.value)

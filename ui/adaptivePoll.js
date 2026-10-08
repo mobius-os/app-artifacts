@@ -7,12 +7,20 @@
 export const POLL_MIN_MS = 3500
 export const POLL_MAX_MS = 10000
 
-// `tick` resolves true when it observed a change. Errors count as no change.
+// `tick` resolves true when it observed a change. Errors count as no change,
+// and so does a tick still pending after `minMs`: one hung read must not stop
+// the poll, so the next tick runs anyway and callers dedupe overlapping work.
 // `poke()` returns to the fast cadence, for focus and visibility returns.
 export function startAdaptivePoll(tick, { minMs = POLL_MIN_MS, maxMs = POLL_MAX_MS } = {}) {
   let delay = minMs
   let timer = null
   let stopped = false
+
+  function settledTick() {
+    let bound = null
+    const pending = new Promise((resolve) => { bound = setTimeout(resolve, minMs, false) })
+    return Promise.race([tick(), pending]).finally(() => clearTimeout(bound))
+  }
 
   const schedule = () => {
     if (!stopped) timer = setTimeout(run, delay)
@@ -22,7 +30,7 @@ export function startAdaptivePoll(tick, { minMs = POLL_MIN_MS, maxMs = POLL_MAX_
     timer = null
     let changed = false
     try {
-      changed = (await tick()) === true
+      changed = (await settledTick()) === true
     } catch {
       changed = false
     }

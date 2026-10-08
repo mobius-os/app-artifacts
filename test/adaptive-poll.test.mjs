@@ -105,3 +105,23 @@ test('an idle view never waits longer than about ten seconds', async () => {
   const { POLL_MAX_MS } = await import('../ui/adaptivePoll.js')
   assert.ok(POLL_MAX_MS <= 10000)
 })
+
+test('a tick that never settles does not stop the poll', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    let ticks = 0
+    const poll = startAdaptivePoll(() => {
+      ticks += 1
+      return ticks === 1 ? new Promise(() => {}) : Promise.resolve(false)
+    }, { minMs: 1000, maxMs: 4000 })
+    await advance(1000) // first tick hangs
+    await advance(1000) // it counts as unchanged once minMs passes
+    await advance(2000)
+    assert.equal(ticks, 2)
+    await advance(4000)
+    assert.equal(ticks, 3)
+    poll.stop()
+  } finally {
+    mock.timers.reset()
+  }
+})
